@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: website-caddyfile
+  namespace: apps
+data:
+  Caddyfile: |
+    :80 {
+        route {
+            @root path /
+            rewrite @root /website/index.html
+
+            @trailingSlash path_regexp slash ^(.+)/$
+            rewrite @trailingSlash /website{re.slash.1}/index.html
+
+            @noExtensionNoTrailingSlash {
+                not path *.*
+                not path */
+            }
+            rewrite @noExtensionNoTrailingSlash /website{path}/index.html
+
+            rewrite * /website{uri}
+
+            reverse_proxy http://192.168.1.88:8333
+        }
+    }

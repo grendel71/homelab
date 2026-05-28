@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pappwiki-ingress
+  namespace: pappwiki
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    cert-manager.io/cluster-issuer: "letsencrypt-production"
+spec:
+  ingressClassName: traefik-internal
+  tls:
+    - hosts:
+      - papp.k8s.local.grendel71.net
+      secretName: pappwiki-tls
+  rules:
+    - host: papp.k8s.local.grendel71.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pappwiki-svc
+                port:
+                  number: 80

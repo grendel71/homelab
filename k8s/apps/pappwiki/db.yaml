@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pappwiki-db
+  namespace: pappwiki
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pappwiki-db
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: pappwiki-db
+    spec:
+      containers:
+      - name: mariadb
+        image: mariadb:11
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: pappwiki-db-secret
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: pappwiki-db-secret
+              key: MYSQL_DATABASE
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: pappwiki-db-secret
+              key: MYSQL_USER
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: pappwiki-db-secret
+              key: MYSQL_PASSWORD
+        args:
+        - --innodb-buffer-pool-size=256M
+        - --innodb-log-file-size=64M
+        - --innodb-flush-log-at-trx-commit=2
+        - --innodb-flush-method=O_DIRECT
+        - --query-cache-type=1
+        - --query-cache-size=32M
+        - --tmp-table-size=32M
+        - --max-heap-table-size=32M
+        - --table-open-cache=400
+        - --thread-cache-size=8
+        - --max-connections=100
+        volumeMounts:
+        - name: db-data
+          mountPath: /var/lib/mysql
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      volumes:
+      - name: db-data
+        persistentVolumeClaim:
+          claimName: pappwiki-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pappwiki-db-svc
+  namespace: pappwiki
+spec:
+  selector:
+    app: pappwiki-db
+  ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306

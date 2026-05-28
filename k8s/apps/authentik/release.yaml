@@ -1,0 +1,36 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: authentik
+  namespace: authentik
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: authentik
+      #version: "0.34.4"
+      sourceRef:
+        kind: HelmRepository
+        name: authentik
+        namespace: authentik
+      interval: 12h
+  values:
+    domain: "https://ak.grendel71.net"
+    
+    authentik:
+      error_reporting:
+        enabled: true
+      postgresql:
+        host: authentik-db-rw.authentik.svc
+        name: authentik
+        user: authentik
+    
+    server:
+      ingress:
+        enabled: false
+    
+    postgresql:
+      enabled: false
+  valuesFrom:
+    - kind: Secret
+      name: authentik-secret-values

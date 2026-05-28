@@ -1,0 +1,13 @@
+.direnv/
+.talosconfig.dev
+.kubeconfig.dev
+kubeconfig
+talosconfig
+controlplane.yaml
+worker.yaml
+docs/
+.env
+age.agekey
+.worktrees/
+workernvme.yaml
+infra/

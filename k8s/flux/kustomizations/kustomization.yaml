@@ -1,0 +1,30 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - sources.yaml
+  - infra-releases.yaml
+  - ceph-cluster.yaml
+  - cert-manager.yaml
+  - cert-manager-issuers.yaml
+  - cnpg.yaml
+  - metallb.yaml
+  - metallb-config.yaml
+  - envoy-gateway.yaml
+  - envoy-gateway-config.yaml
+  - external-dns-cloudflare.yaml
+  - cloudflared.yaml
+  - storage.yaml
+  - apps-namespace.yaml
+  - traefik-internal.yaml
+  - arc.yaml
+  - nvidia-operator.yaml
+  - app-authentik.yaml
+  - app-jellyfin.yaml
+  - app-nextcloud.yaml
+  - app-open-webui.yaml
+  - app-pappwiki.yaml
+  - app-vaultwarden.yaml
+  - app-website.yaml
+  #  - crds.yaml
+  - ingress.yaml

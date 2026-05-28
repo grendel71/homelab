@@ -1,0 +1,19 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: sources
+  namespace: flux-system
+resources:
+  - arc.yaml
+  - cert-manager.yaml
+  - cnpg.yaml
+  - envoy-gateway.yaml
+  - metallb.yaml
+  - nfs-subdir.yaml
+  - nvoperator.yaml
+  - open-webui.yaml
+  - rook.yaml
+  - rook-release.yaml
+  - technitium.yaml
+  - traefik.yaml
