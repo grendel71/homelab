@@ -1,0 +1,65 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: cloudflared
+  labels:
+    app.kubernetes.io/name: cloudflared
+spec:
+  replicas: 2  # HA - run on multiple nodes
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cloudflared
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cloudflared
+    spec:
+      containers:
+        - name: cloudflared
+          image: cloudflare/cloudflared:2024.12.2
+          args:
+            - tunnel
+            - --config
+            - /etc/cloudflared/config.yaml
+            - --credentials-file
+            - /etc/cloudflared-credentials/credentials.json
+            - run
+          ports:
+            - containerPort: 2000
+              name: metrics
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /etc/cloudflared
+              readOnly: true
+            - name: credentials
+              mountPath: /etc/cloudflared-credentials
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: cloudflared-config
+        - name: credentials
+          secret:
+            secretName: cloudflared-tunnel

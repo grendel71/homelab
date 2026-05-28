@@ -10,4 +10,4 @@ docs/
 age.agekey
 .worktrees/
 workernvme.yaml
-infra/
+talos-infra

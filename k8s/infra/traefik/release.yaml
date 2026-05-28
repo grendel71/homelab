@@ -1,0 +1,49 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: traefik-internal
+  namespace: traefik-internal
+spec:
+  chart:
+    spec:
+      chart: traefik
+      version: 33.x 
+      sourceRef:
+        kind: HelmRepository
+        name: traefik
+        namespace: flux-system
+  interval: 15m
+  timeout: 5m
+  releaseName: traefik-internal
+  values:
+    providers:
+      kubernetesIngress:
+        ingressClass: traefik-internal
+    service:  
+      type: LoadBalancer
+      spec:
+        externalTrafficPolicy: Local
+      annotations: 
+        metallb.universe.tf/address-pool: metallb-pool
+        metallb.universe.tf/loadBalancerIPs: "192.168.1.68"
+
+    ports:
+      websecure:
+        expose: 
+          default: true
+        exposedPort: 443
+        port: 8443
+        protocol: TCP
+      web:
+        expose: 
+          default: true
+        exposedPort: 80
+        port: 8000
+        protocol: TCP
+        redirectTo:
+          port: websecure
+
+    additionalArguments:
+    - "--providers.kubernetesingress.ingressendpoint.publishedservice=traefik-internal/traefik-internal"
+    - "--accesslog=true"
+    - "--accesslog.format=json"

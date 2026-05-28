@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: generic-cdi-plugin
+  namespace: gpu-operator
+spec:
+  selector:
+    matchLabels:
+      app: generic-cdi-plugin
+  template:
+    metadata:
+      labels:
+        app: generic-cdi-plugin
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nixos-nvidia-cdi
+                    operator: In
+                    values:
+                      - enabled
+      containers:
+        - name: generic-cdi-plugin
+          image: ghcr.io/olfillasodikno/generic-cdi-plugin:main
+          command:
+            - /generic-cdi-plugin
+            - /var/run/cdi/nvidia-container-toolkit.json
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: kubelet
+              mountPath: /var/lib/kubelet
+            - name: cdi-spec
+              mountPath: /var/run/cdi/nvidia-container-toolkit.json
+      volumes:
+        - name: kubelet
+          hostPath:
+            path: /var/lib/kubelet
+        - name: cdi-spec
+          hostPath:
+            path: /var/run/cdi/nvidia-container-toolkit.json

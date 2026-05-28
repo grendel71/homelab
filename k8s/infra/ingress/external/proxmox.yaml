@@ -1,0 +1,68 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pve-cert
+  namespace: kube-system # Specify the namespace where the secret will be created
+spec:
+  secretName: pve-tls # The name of the Kubernetes Secret to store the certs in
+  issuerRef:
+    name: letsencrypt-production # Name of your Issuer or ClusterIssuer
+    kind: ClusterIssuer # Use 'Issuer' if it is namespace-scoped
+  dnsNames:
+    - "pve.k8s.local.grendel71.net" # Replace with your domain name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pve
+  namespace: kube-system
+spec:
+  ports:
+    - port: 8006
+      targetPort: 8006
+---
+apiVersion: v1
+kind: Endpoints
+metadata: 
+  name: pve
+  namespace: kube-system
+subsets:
+  - addresses:
+      - ip: 192.168.1.156
+    ports:
+      - port: 8006
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-to-https
+  namespace: kube-system
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: proxmox-ve
+  namespace: kube-system
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-production"
+spec:
+  entryPoints:
+    - websecure
+    - web
+  routes:
+    - match: Host(`pve.k8s.local.grendel71.net`)
+      kind: Rule
+      middlewares:
+        - name: redirect-to-https
+      services:
+        - name: pve
+          namespace: kube-system
+          port: 8006
+          scheme: https
+          serversTransport: skipverify
+  tls:
+    secretName: pve-tls

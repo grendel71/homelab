@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rathole
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rathole-config
+  namespace: rathole
+data:
+  client.toml: |
+    [client]
+    remote_addr = "129.80.62.202:2333" # The address of the server. The port must be the same with the port in `server.bind_addr`
+    default_token = "qtAcd5Wvha/YUhGx4DmgCwPTChCmQGMu4ylwRdwtwPY="
+    retry_interval = 1
+
+    [client.transport] # The whole block is optional. Specify which transport to use
+    type = "tcp" # Optional. Possible values: ["tcp", "tls", "noise"]. Default: "tcp"
+
+    [client.transport.tcp]
+    keepalive_secs = 5 # Optional. Specify `tcp_keepalive_time` in `tcp(7)`, if applicable. Default: 20 seconds
+    keepalive_interval = 2 # Optional. Specify `tcp_keepalive_intvl` in `tcp(7)`, if applicable. Default: 8 seconds
+
+    [client.services.ssh1]
+    local_addr = "192.168.1.169:22"
+    type = "tcp"
+    nodelay = true
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rathole-deployment
+  namespace: rathole
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rathole-app
+  template:
+    metadata:
+      labels:
+        app: rathole-app
+    spec:
+      containers:
+        - name: rathole-container
+          command: ["/app/rathole"]
+          args: ["--client", "/app/config/client.toml"]
+          image: rapiz1/rathole
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config # fixed capitalization
+              readOnly: true
+      volumes:
+        - name: config-volume
+          configMap:
+            name: rathole-config

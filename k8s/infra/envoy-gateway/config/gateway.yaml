@@ -1,0 +1,59 @@
+---
+# External Gateway - for services exposed to the internet
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: envoy-external
+  namespace: envoy-gateway-system
+  annotations:
+    # Use a different IP than current Traefik external (192.168.1.67)
+    # to allow parallel testing before migration
+    metallb.universe.tf/loadBalancerIPs: "192.168.1.69"
+spec:
+  gatewayClassName: envoy
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: grendel71-net-tls
+            namespace: envoy-gateway-system
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: envoy-internal
+  namespace: envoy-gateway-system
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: "192.168.1.70"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+spec:
+  gatewayClassName: envoy
+  listeners:
+    # HTTP listener for redirects
+    - name: web
+      protocol: HTTP
+      port: 80
+    - name: websecure
+      port: 443
+      protocol: HTTPS
+      hostname: "*.envoy.grendel71.net"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: envoy-internal-tls
+      allowedRoutes:
+        namespaces:
+          from: All
