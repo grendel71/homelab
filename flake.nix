@@ -35,11 +35,11 @@
               export TALOSCONFIG="$PWD/.talosconfig.dev"
 
               # Edit these to match your cluster.
-              export CONTROL_PLANE_IPS="192.168.1.145"
+              export CONTROL_PLANE_IPS="192.168.1.146"
               export WORKER_IPS="192.168.1.158"
 
               # Used by some scripts/tools (Kubernetes API endpoint, not Talos API).
-              export ENDPOINT="https://192.168.1.145:6443"
+              export ENDPOINT="https://192.168.1.146:6443"
 
               if [ -f "$PWD/secrets/talosconfig.sops.yaml" ]; then
                 umask 077
