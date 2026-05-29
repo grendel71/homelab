@@ -27,8 +27,7 @@
             shellHook = ''
               export KUBECONFIG="$PWD/.kubeconfig.dev"
 
-              export SOPS_AGE_KEY_FILE="''${SOPS_AGE_KEY_FILE:-$HOME/.config/sops/age/keys.txt}"
-
+	      export SOPS_AGE_KEY_FILE=./age.agekey
               # Talos config in-repo doesn't include nodes by default; talosctl then requires
               # specifying --nodes on every command. Keep the original as a source of truth,
               # but generate a dev config with nodes pre-set.

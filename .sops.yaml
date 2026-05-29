@@ -1,13 +1,10 @@
 keys:
-  - &talos_dev age1lhypvm2k3r7g6ycwzscugdrcfa0cajla3m72yq5jlusyepe8ysps69hvhc
   - &homelab age1jc2yh5yr5xdmgfu46q42z3pxy0aztn94x5hsarzmjwxzt9f4tq3qtsmrup
 
 creation_rules:
   - path_regex: (?:^|.*/)secrets/.*\.sops\.(yaml|yml|json)$
     encrypted_regex: '^(ca|crt|key|.*)$'
-    key_groups:
-      - age:
-          - *talos_dev
+    age: *homelab
   - path_regex: secret-values\.yaml$
     encrypted_regex: "^(data|stringData)$"
     age: *homelab
