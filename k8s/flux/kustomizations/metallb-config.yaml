@@ -6,6 +6,7 @@ metadata:
 spec:
   dependsOn:
     - name: metallb
+    - name: namespace
   interval: 15m
   path: ./k8s/infra/metallb/config
   prune: true # remove any elements later removed from the above path

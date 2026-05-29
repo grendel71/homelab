@@ -3,4 +3,16 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - apps.yaml
-  - nvidia.yaml
+  - authentik.yaml
+  - cert-manager.yaml
+  - cloudflared.yaml
+  - cnpg-system.yaml
+  - envoy-gateway-system.yaml
+  - external-dns.yaml
+  - gpu-operator.yaml
+  - metallb-system.yaml
+  - nextcloud-new.yaml
+  - pappwiki.yaml
+  - rook-ceph.yaml
+  - traefik-internal.yaml
+  - vaultwarden.yaml

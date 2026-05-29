@@ -5,5 +5,4 @@ metadata:
   name: infra-releases
   namespace: flux-system
 resources:
-  - rook-ceph-ns.yaml
   - rook-ceph.yaml

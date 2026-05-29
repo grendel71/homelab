@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
 - source.yaml
 - release.yaml
-- namespace.yaml
 - db.yaml
 - secret.yaml
 - secret-values.yaml

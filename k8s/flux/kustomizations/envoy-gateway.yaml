@@ -16,6 +16,7 @@ spec:
   dependsOn:
     - name: cert-manager
     - name: metallb
+    - name: namespace
   healthChecks:
     - apiVersion: apps/v1
       kind: Deployment

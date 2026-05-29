@@ -15,6 +15,7 @@ spec:
   timeout: 5m
   dependsOn:
     - name: envoy-gateway
+    - name: namespace
   decryption:
     provider: sops
     secretRef:
