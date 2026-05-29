@@ -38,8 +38,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: vip_interface
-          value: ens18         # <- CHANGE to your host interface or omit
         - name: vip_subnet
           value: "32"
         - name: cp_enable
@@ -57,7 +55,7 @@ spec:
         - name: vip_retryperiod
           value: "1"
         - name: address
-          value: 192.168.1.100   # <- CHANGE to your VIP
+          value: 192.168.1.100
         image: ghcr.io/kube-vip/kube-vip:v1.0.4
         imagePullPolicy: Always
         name: kube-vip
