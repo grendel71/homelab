@@ -15,7 +15,7 @@ resources:
   - external-dns-cloudflare.yaml
   - cloudflared.yaml
   - storage.yaml
-  - apps-namespace.yaml
+  - namespaces.yaml
   - traefik-internal.yaml
   - arc.yaml
   - nvidia-operator.yaml

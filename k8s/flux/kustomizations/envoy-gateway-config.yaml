@@ -7,6 +7,8 @@ metadata:
   namespace: flux-system
 spec:
   interval: 15m
+  dependsOn:
+    - name: namespace
   path: ./k8s/infra/envoy-gateway/config
   prune: true
   timeout: 2m
