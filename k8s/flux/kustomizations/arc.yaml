@@ -4,6 +4,8 @@ metadata:
   name: actions-runner-controller
   namespace: flux-system
 spec:
+  dependsOn:
+    - infra-releases
   interval: 10m
   sourceRef:
     kind: GitRepository

@@ -6,3 +6,4 @@ metadata:
   namespace: flux-system
 resources:
   - rook-ceph.yaml
+  - actions-runner-controller.yaml
