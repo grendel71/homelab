@@ -15,5 +15,6 @@ spec:
   dependsOn:
     - name: sources
     - name: namespace
+    - name: infra-secrets
   timeout: 3m0s
   wait: true

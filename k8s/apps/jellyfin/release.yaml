@@ -20,8 +20,8 @@ spec:
     runtimeClassName: nvidia
     nodeSelector:
       nvidia.com/gpu.present: "true"
-    securityContext:
-      privileged: true
+    #securityContext:
+    #  privileged: true
     resources:
       limits:
         nvidia.com/gpu: "1"
@@ -32,7 +32,7 @@ spec:
 
     extraVolumeMounts:
       - name: dri
-        mountPath: /dev/dri    
+        mountPath: /dev/dri
     persistence:
       config:
         enabled: true
