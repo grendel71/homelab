@@ -5,7 +5,7 @@ metadata:
   namespace: flux-system
 spec:
   dependsOn:
-    - infra-releases
+    - name: infra-releases
   interval: 10m
   sourceRef:
     kind: GitRepository
