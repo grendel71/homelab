@@ -26,9 +26,7 @@ spec:
         name: time-slicing-config-all
         default: any
     dcgmExporter:
-      enabled: true
-      serviceMonitor:
-        enabled: true
+      enabled: false
     gfd:
       enabled: true
     migManager:
@@ -39,3 +37,9 @@ spec:
       env:
         - name: DISABLE_DEV_CHAR_SYMLINK_CREATION
           value: "true"
+    sandboxDevicePlugin:
+      enabled: false
+    vfioManager:
+      enabled: false
+    vgpuDeviceManager:
+      enabled: false

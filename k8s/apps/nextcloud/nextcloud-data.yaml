@@ -4,6 +4,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: nextcloud-data-pvc
   namespace: nextcloud-new
+  annotations:
+    kustomize.toolkit.fluxcd.io/ssa: Merge
 spec:
   accessModes:
     - ReadWriteOnce
