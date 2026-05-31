@@ -16,6 +16,8 @@ spec:
   timeout: 5m
   releaseName: gpu-operator
   values:
+    hostPaths:
+      driverInstallDir: /
     driver:
       enabled: false
     toolkit:
