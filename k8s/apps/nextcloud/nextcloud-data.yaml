@@ -5,7 +5,7 @@ metadata:
   name: nextcloud-data-pvc
   namespace: nextcloud-new
   annotations:
-    kustomize.toolkit.fluxcd.io/ssa: Merge
+    kustomize.toolkit.fluxcd.io/ssa: IfNotPresent
 spec:
   accessModes:
     - ReadWriteOnce
