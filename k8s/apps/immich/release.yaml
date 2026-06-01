@@ -15,16 +15,17 @@ spec:
         namespace: flux-system
       interval: 12h
   values:
-    envFrom:
-      - secretRef:
-          name: immich-postgres-user
-    env:
-      REDIS_HOSTNAME: '{{ printf "%s-redis-master" .Release.Name }}'
-      DB_HOSTNAME: "immich-postgres-rw.immich.svc.cluster.local"
-      IMMICH_MACHINE_LEARNING_URL: '{{ printf "http://%s-machine-learning:3003" .Release.Name }}'
-
-    image:
-      tag: v1.124.2
+    controllers:
+      main:
+        containers:
+          main:
+            envFrom:
+              - secretRef:
+                  name: immich-postgres-user
+            env:
+              REDIS_HOSTNAME: '{{ printf "%s-valkey" .Release.Name }}'
+              DB_HOSTNAME: "immich-postgres-rw.immich.svc.cluster.local"
+              IMMICH_MACHINE_LEARNING_URL: '{{ printf "http://%s-machine-learning:3003" .Release.Name }}'
 
     immich:
       metrics:
@@ -35,31 +36,36 @@ spec:
       configuration: {}
 
     # Dependencies
-    redis:
+    valkey:
       enabled: true
-      architecture: standalone
-      auth:
-        enabled: false
 
     # Immich components
     server:
       enabled: true
-      image:
-        repository: ghcr.io/immich-app/immich-server
-        pullPolicy: IfNotPresent
+      controllers:
+        main:
+          containers:
+            main:
+              image:
+                repository: ghcr.io/immich-app/immich-server
+                pullPolicy: IfNotPresent
       ingress:
         main:
           enabled: false
 
     machine-learning:
       enabled: true
-      image:
-        repository: ghcr.io/immich-app/immich-machine-learning
-        pullPolicy: IfNotPresent
-      env:
-        TRANSFORMERS_CACHE: /cache
+      controllers:
+        main:
+          containers:
+            main:
+              image:
+                repository: ghcr.io/immich-app/immich-machine-learning
+                pullPolicy: IfNotPresent
+              env:
+                TRANSFORMERS_CACHE: /cache
+                HF_XET_CACHE: /cache/huggingface-xet
+                MPLCONFIGDIR: /cache/matplotlib-config
       persistence:
         cache:
-          enabled: true
-          size: 10Gi
           existingClaim: immich-ml-pvc
