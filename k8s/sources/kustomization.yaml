@@ -17,3 +17,4 @@ resources:
   - rook-release.yaml
   - technitium.yaml
   - traefik.yaml
+  - immich.yaml

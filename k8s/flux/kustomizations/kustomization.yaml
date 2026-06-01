@@ -26,6 +26,7 @@ resources:
   - app-pappwiki.yaml
   - app-vaultwarden.yaml
   - app-website.yaml
+  - app-immich.yaml
   - kubevip.yaml
   #  - crds.yaml
   - ingress.yaml

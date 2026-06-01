@@ -4,3 +4,5 @@ kind: Kustomization
 resources:
   - jellyfin-media.yaml
   - nextcloud-nfs.yaml
+  - immich-media.yaml
+  - immich-ml.yaml
