@@ -52,6 +52,12 @@ spec:
       ingress:
         main:
           enabled: false
+      persistence:
+        nextcloud:
+          existingClaim: immich-nc-pvc
+          globalMounts:
+            - path: /mnt/nextcloud
+              readOnly: true
 
     machine-learning:
       enabled: true

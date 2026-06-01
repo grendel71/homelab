@@ -2,6 +2,40 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
+  name: grendel-nc-pv-nfs-immich
+spec:
+  capacity:
+    storage: 4Ti
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: slow
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+  nfs:
+    path: /mnt/grendel/subvol-400-disk-0
+    server: 192.168.1.231
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-nc-pvc
+  namespace: immich
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: slow
+  volumeName: grendel-nc-pv-nfs-immich
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 4Ti
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
   name: grendel-nc-pv-nfs
 spec:
   capacity:
