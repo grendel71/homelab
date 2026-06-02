@@ -19,7 +19,7 @@ spec:
       backendRefs:
         - group: gateway.envoyproxy.io
           kind: Backend
-          port: pve-ryzen-backend
+          name: pve-ryzen-backend
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: Backend
@@ -28,8 +28,8 @@ metadata:
   namespace: kube-system
 spec:
   endpoints:
-    - fqdn:
-        hostname: 192.168.1.156
+    - ip:
+        address: 192.168.1.156
         port: 8006
   tls:
     insecureSkipVerify: true
