@@ -19,9 +19,13 @@ spec:
     providers:
       kubernetesIngress:
         ingressClass: traefik-internal
+        publishedService:
+          enabled: true
+          pathOverride: traefik-internal/traefik-internal
     service:
-      type: LoadBalancer
+      enabled: true
       spec:
+        type: LoadBalancer
         externalTrafficPolicy: Local
       annotations:
         metallb.universe.tf/address-pool: metallb-pool
@@ -40,10 +44,13 @@ spec:
         exposedPort: 80
         port: 8000
         protocol: TCP
-        redirectTo:
-          port: websecure
+        http:
+          redirections:
+            entryPoint:
+              to: websecure
+              scheme: https
 
-    additionalArguments:
-      - "--providers.kubernetesingress.ingressendpoint.publishedservice=traefik-internal/traefik-internal"
-      - "--accesslog=true"
-      - "--accesslog.format=json"
+    logs:
+      access:
+        enabled: true
+        format: json
