@@ -5,3 +5,4 @@ resources:
   - proxmox.yaml
   - pve2.yaml
   - skipverify.yaml
+  - proxmox-httproute.yaml
