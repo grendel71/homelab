@@ -7,7 +7,7 @@ spec:
   chart:
     spec:
       chart: traefik
-      version: 33.x 
+      version: 40.x
       sourceRef:
         kind: HelmRepository
         name: traefik
@@ -19,23 +19,23 @@ spec:
     providers:
       kubernetesIngress:
         ingressClass: traefik-internal
-    service:  
+    service:
       type: LoadBalancer
       spec:
         externalTrafficPolicy: Local
-      annotations: 
+      annotations:
         metallb.universe.tf/address-pool: metallb-pool
         metallb.universe.tf/loadBalancerIPs: "192.168.1.68"
 
     ports:
       websecure:
-        expose: 
+        expose:
           default: true
         exposedPort: 443
         port: 8443
         protocol: TCP
       web:
-        expose: 
+        expose:
           default: true
         exposedPort: 80
         port: 8000
@@ -44,6 +44,6 @@ spec:
           port: websecure
 
     additionalArguments:
-    - "--providers.kubernetesingress.ingressendpoint.publishedservice=traefik-internal/traefik-internal"
-    - "--accesslog=true"
-    - "--accesslog.format=json"
+      - "--providers.kubernetesingress.ingressendpoint.publishedservice=traefik-internal/traefik-internal"
+      - "--accesslog=true"
+      - "--accesslog.format=json"
