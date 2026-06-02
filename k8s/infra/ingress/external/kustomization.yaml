@@ -6,3 +6,6 @@ resources:
   - pve2.yaml
   - skipverify.yaml
   - proxmox-httproute.yaml
+  - truenas.yaml
+  - router.yaml
+  - dns.yaml
