@@ -5,6 +5,7 @@ resources:
   - sources.yaml
   - infra-releases.yaml
   - ceph-cluster.yaml
+  - object-store.yaml
   - cert-manager.yaml
   - cert-manager-issuers.yaml
   - cnpg.yaml
