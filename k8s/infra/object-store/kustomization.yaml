@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - ceph-object-store.yaml
   - ceph-object-store-user.yaml
+  - httproute.yaml
