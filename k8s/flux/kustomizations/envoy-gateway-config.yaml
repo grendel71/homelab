@@ -9,6 +9,7 @@ spec:
   interval: 15m
   dependsOn:
     - name: namespace
+    - name: crds
   path: ./k8s/infra/envoy-gateway/config
   prune: true
   timeout: 2m

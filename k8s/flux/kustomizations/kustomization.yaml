@@ -29,6 +29,6 @@ resources:
   - app-website.yaml
   - app-immich.yaml
   - kubevip.yaml
-  #  - crds.yaml
+  - crds.yaml
   - ingress.yaml
   - infra-secrets.yaml

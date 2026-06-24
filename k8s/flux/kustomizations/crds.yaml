@@ -7,6 +7,9 @@ metadata:
 spec:
   interval: 5m0s
   path: ./k8s/crds
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
   prune: true
   retryInterval: 2m0s
   dependsOn:

@@ -17,6 +17,7 @@ spec:
     - name: cert-manager
     - name: metallb
     - name: namespace
+    - name: crds
   healthChecks:
     - apiVersion: apps/v1
       kind: Deployment
