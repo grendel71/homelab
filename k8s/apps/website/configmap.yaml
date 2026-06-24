@@ -13,6 +13,8 @@ data:
             }
             rewrite @dir {path}/index.html
 
+            rewrite * /my-bucket{uri}
+
             reverse_proxy http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local
         }
     }
