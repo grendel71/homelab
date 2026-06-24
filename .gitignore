@@ -11,3 +11,4 @@ age.agekey
 .worktrees/
 workernvme.yaml
 talos-infra
+patches/
