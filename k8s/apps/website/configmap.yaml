@@ -7,11 +7,13 @@ data:
   Caddyfile: |
     :80 {
         route {
-            @dir {
+            @slash path_regexp slash ^(.*)/+$
+            rewrite @slash /my-bucket{re.slash.1}/index.html
+
+            @noext {
                 not path *.*
-                not path */
             }
-            rewrite @dir {path}/index.html
+            rewrite @noext /my-bucket{path}/index.html
 
             rewrite * /my-bucket{uri}
 
