@@ -6,6 +6,7 @@ metadata:
 spec:
   dependsOn:
     - name: infra-releases
+    - name: namespace
   interval: 10m
   sourceRef:
     kind: GitRepository

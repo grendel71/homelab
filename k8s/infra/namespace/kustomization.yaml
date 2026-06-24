@@ -17,3 +17,4 @@ resources:
   - traefik-internal.yaml
   - vaultwarden.yaml
   - immich.yaml
+  - arc.yaml
