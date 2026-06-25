@@ -1,0 +1,46 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: payments-platform
+  namespace: payments
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: ./payments-platform
+      sourceRef:
+        kind: GitRepository
+        name: payment-processor
+        namespace: flux-system
+      interval: 5m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    image:
+      repository: ghcr.io/grendel71/payment-processor
+      tag: latest
+      pullPolicy: Always
+
+    database:
+      existingSecret:
+        name: paymentprocessor-db
+        key: DATABASE_URL
+
+    migrations:
+      enabled: true
+
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+
+    networkPolicy:
+      enabled: false
+
+    autoscaling:
+      enabled: false
+
+    replicaCount: 2

@@ -28,6 +28,7 @@ resources:
   - app-vaultwarden.yaml
   - app-website.yaml
   - app-immich.yaml
+  - app-payments.yaml
   - kubevip.yaml
   - crds.yaml
   - ingress.yaml

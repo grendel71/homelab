@@ -1,0 +1,13 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: payment-processor
+  namespace: flux-system
+spec:
+  interval: 1m
+  url: ssh://git@github.com/grendel71/payment-processor.git
+  ref:
+    branch: main
+  secretRef:
+    name: flux-system

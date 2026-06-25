@@ -18,3 +18,4 @@ resources:
   - vaultwarden.yaml
   - immich.yaml
   - arc.yaml
+  - payments.yaml
