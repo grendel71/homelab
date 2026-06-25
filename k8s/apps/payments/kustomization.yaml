@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - source.yaml
   - secret.yaml
+  - db.yaml
   - release.yaml
   - cert.yaml
   - httproute.yaml
