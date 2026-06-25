@@ -31,7 +31,7 @@ spec:
         key: DATABASE_URL
 
     migrations:
-      enabled: true
+      enabled: false
 
     podDisruptionBudget:
       enabled: true
