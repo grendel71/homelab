@@ -5,13 +5,15 @@ kind: HTTPRoute
 metadata:
   name: payments-platform-internal
   namespace: payments
+  annotations:
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
 spec:
   parentRefs:
-    - name: envoy-internal
+    - name: envoy-external
       namespace: envoy-gateway-system
-      sectionName: websecure
+      sectionName: https
   hostnames:
-    - payments.envoy.grendel71.net
+    - papi.grendel71.net
   rules:
     - matches:
         - path:
