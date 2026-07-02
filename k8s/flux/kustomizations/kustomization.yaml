@@ -33,3 +33,4 @@ resources:
   - crds.yaml
   - ingress.yaml
   - infra-secrets.yaml
+  - velero.yaml

@@ -1,0 +1,51 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: velero
+  namespace: kube-system
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: velero
+      version: ">=7.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: velero-chart
+        namespace: flux-system
+      interval: 1h
+  install:
+    createNamespace: true
+  values:
+    configuration:
+      defaultVolumesToFsBackup: true
+      backupStorageLocation:
+        - name: default
+          provider: aws
+          bucket: ssmif-backup-prod
+          config:
+            region: default
+            s3ForcePathStyle: "true"
+            s3Url: http://192.168.1.231:30304
+      volumeSnapshotLocation:
+        - name: default
+          provider: aws
+          config:
+            region: default
+    credentials:
+      useSecret: true
+      existingSecret: credentials-sw
+    deployNodeAgent: true
+    nodeAgent:
+      podVolumePath: /var/lib/kubelet/pods
+
+    initContainers:
+      - name: velero-plugin-for-aws
+        image: velero/velero-plugin-for-aws:v1.10.0
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+          - mountPath: /target
+            name: plugins
+    kubectl:
+      image:
+        repository: public.ecr.aws/bitnami/kubectl

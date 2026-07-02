@@ -18,3 +18,4 @@ resources:
   - technitium.yaml
   - traefik.yaml
   - immich.yaml
+  - velero.yaml
