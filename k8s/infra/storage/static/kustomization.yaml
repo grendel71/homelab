@@ -6,3 +6,4 @@ resources:
   - nextcloud-nfs.yaml
   - immich-media.yaml
   - immich-ml.yaml
+  - lazywarden-backup-nfs.yaml
