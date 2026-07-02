@@ -7,3 +7,6 @@ resources:
   - secret-values.yaml
   - httproute.yaml
   - data-pvc.yaml
+  - lazywarden-deployment.yaml
+  - lazywarden-secret-env.yaml
+  - lazywarden-config-pvc.yaml
