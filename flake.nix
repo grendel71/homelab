@@ -22,6 +22,7 @@
               age
               ssh-to-age
 	      fluxcd
+	      velero
             ];
 
             shellHook = ''
