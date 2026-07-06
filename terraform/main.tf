@@ -58,10 +58,10 @@ resource "proxmox_virtual_environment_vm" "talos_controlplane" {
     # mac_address is auto-assigned by Proxmox; Talos ignores it during PXE
   }
 
-  # iPXE boot script delivered via IPXE URL.
-  # bpg/proxmox exposes this via the `ipxe_config` argument on the network device.
-  # Talos factory serves the full chain-load script at this URL.
-  # NOTE: Proxmox must be able to reach pxe.factory.talos.dev on port 443.
+  # PXE boot is enabled via boot_order = ["net0", "scsi0"] above.
+  # Your network DHCP/iPXE server must chainload:
+  #   https://pxe.factory.talos.dev/pxe/3abf06e1d81e509d779dc256f9feae6cd6d82c69337c661cbfc383a92594faf5
+  # See terraform.tfvars.example and plan docs for ISO fallback instructions.
   operating_system {
     type = "l26" # Linux 2.6+ kernel
   }
