@@ -1,0 +1,16 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# terraform.tfvars is gitignored - never commit secrets.
+
+proxmox_endpoint         = "https://192.168.1.171:8006/"
+proxmox_api_token_id     = "terraform@pam!tf"
+proxmox_api_token_secret = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Match the node name shown in Proxmox UI > Datacenter (left panel)
+proxmox_node = "pve"
+
+vm_name        = "talos-cp-03"
+vm_id          = 300
+datastore_id   = "local-lvm"
+network_bridge = "vmbr0"
+
+talos_factory_hash = "3abf06e1d81e509d779dc256f9feae6cd6d82c69337c661cbfc383a92594faf5"
