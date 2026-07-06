@@ -12,7 +12,7 @@
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
     in {
       devShells = forAllSystems (system:
-        let pkgs = nixpkgs.legacyPackages.${system};
+        let pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
         in {
           default = pkgs.mkShell {
             buildInputs = with pkgs; [
@@ -23,6 +23,7 @@
               ssh-to-age
 	      fluxcd
 	      velero
+	      terraform
             ];
 
             shellHook = ''
