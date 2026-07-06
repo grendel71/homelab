@@ -14,3 +14,4 @@ datastore_id   = "local-lvm"
 network_bridge = "vmbr0"
 
 talos_factory_hash = "3abf06e1d81e509d779dc256f9feae6cd6d82c69337c661cbfc383a92594faf5"
+vm_ip          = "192.168.1.103"

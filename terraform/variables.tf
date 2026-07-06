@@ -51,3 +51,9 @@ variable "talos_factory_hash" {
   type        = string
   default     = "3abf06e1d81e509d779dc256f9feae6cd6d82c69337c661cbfc383a92594faf5"
 }
+
+variable "vm_ip" {
+  description = "Static IP of the new control plane node. Set in talos-infra/controlplane.yaml, not managed by Terraform. Used only in post-provision output."
+  type        = string
+  default     = "192.168.1.103"
+}

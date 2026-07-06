@@ -18,13 +18,13 @@ output "post_provision_steps" {
 
     2. Apply the control plane machine config (from repo root):
        talosctl apply-config --insecure \
-         --nodes 192.168.1.103 \
+         --nodes ${var.vm_ip} \
          --file talos-infra/controlplane.yaml
 
     3. Verify the node joins the cluster:
        kubectl get nodes -o wide
 
-    Note: Node IP 192.168.1.103 is set in talos-infra/controlplane.yaml,
+    Note: Node IP ${var.vm_ip} is set in talos-infra/controlplane.yaml,
     not managed by Terraform.
   EOT
 }

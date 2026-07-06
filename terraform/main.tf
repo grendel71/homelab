@@ -49,7 +49,7 @@ resource "proxmox_virtual_environment_vm" "talos_controlplane" {
     size         = 100
     file_format  = "raw"
     ssd          = true
-    discard      = "on"
+    discard      = "on"      # enables TRIM/discard passthrough (valid values: "on", "ignore")
   }
 
   network_device {
