@@ -10,6 +10,7 @@ proxmox_node     = "pve"
 datastore_id     = "local-lvm"
 iso_datastore_id = "local"
 network_bridge   = "vmbr0"
+network_interface = "eth0"
 
 talos_version = "v1.13.0"
 
@@ -23,9 +24,9 @@ control_plane_disk   = 100
 control_plane_factory_hash = "3abf06e1d81e509d779dc256f9feae6cd6d82c69337c661cbfc383a92594faf5"
 
 control_planes = {
-  cp-03 = { ip = "192.168.1.103", vm_id = 300 }
-  # cp-04 = { ip = "192.168.1.104", vm_id = 301 }
-  # cp-05 = { ip = "192.168.1.105", vm_id = 302 }
+  cp-03 = { ip = "192.168.1.103", vm_id = 300, gateway = "192.168.1.1", netmask = 24 }
+  # cp-04 = { ip = "192.168.1.104", vm_id = 301, gateway = "192.168.1.1", netmask = 24 }
+  # cp-05 = { ip = "192.168.1.105", vm_id = 302, gateway = "192.168.1.1", netmask = 24 }
 }
 
 # --- Worker nodes ---
@@ -39,6 +40,6 @@ worker_factory_hash = ""
 
 workers = {}
 # workers = {
-#   w-01 = { ip = "192.168.1.201", vm_id = 401 }
-#   w-02 = { ip = "192.168.1.202", vm_id = 402 }
+#   w-01 = { ip = "192.168.1.201", vm_id = 401, gateway = "192.168.1.1", netmask = 24 }
+#   w-02 = { ip = "192.168.1.202", vm_id = 402, gateway = "192.168.1.1", netmask = 24 }
 # }
