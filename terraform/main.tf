@@ -7,7 +7,7 @@ provider "proxmox" {
 # --- ISO downloads ---
 
 # Control plane ISO: always downloaded (control_planes map is never empty).
-resource "proxmox_virtual_environment_download_file" "talos_iso_controlplane" {
+resource "proxmox_download_file" "talos_iso_controlplane" {
   node_name    = var.proxmox_node
   content_type = "iso"
   datastore_id = var.iso_datastore_id
@@ -17,7 +17,7 @@ resource "proxmox_virtual_environment_download_file" "talos_iso_controlplane" {
 }
 
 # Worker ISO: only downloaded when workers map is non-empty and hash is set.
-resource "proxmox_virtual_environment_download_file" "talos_iso_worker" {
+resource "proxmox_download_file" "talos_iso_worker" {
   count = length(var.workers) > 0 && var.worker_factory_hash != "" ? 1 : 0
 
   node_name    = var.proxmox_node
@@ -46,7 +46,7 @@ resource "proxmox_virtual_environment_vm" "control_plane" {
   boot_order = ["ide2", "scsi0"]
 
   cdrom {
-    file_id   = proxmox_virtual_environment_download_file.talos_iso_controlplane.id
+    file_id   = proxmox_download_file.talos_iso_controlplane.id
     interface = "ide2"
   }
 
@@ -114,7 +114,7 @@ resource "proxmox_virtual_environment_vm" "worker" {
   boot_order = ["ide2", "scsi0"]
 
   cdrom {
-    file_id   = proxmox_virtual_environment_download_file.talos_iso_worker[0].id
+    file_id   = proxmox_download_file.talos_iso_worker[0].id
     interface = "ide2"
   }
 
@@ -162,11 +162,11 @@ resource "proxmox_virtual_environment_vm" "worker" {
 
   lifecycle {
     prevent_destroy = true
-  }
 
-  # Guard: fail clearly if workers are declared but no hash provided.
-  precondition {
-    condition     = var.worker_factory_hash != ""
-    error_message = "worker_factory_hash must be set when the workers map is non-empty."
+    # Guard: fail clearly if workers are declared but no hash provided.
+    precondition {
+      condition     = var.worker_factory_hash != ""
+      error_message = "worker_factory_hash must be set when the workers map is non-empty."
+    }
   }
 }
