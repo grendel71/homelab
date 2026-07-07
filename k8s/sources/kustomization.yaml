@@ -9,13 +9,14 @@ resources:
   - cert-manager.yaml
   - cnpg.yaml
   - envoy-gateway.yaml
+  - immich.yaml
   - metallb.yaml
   - nfs-subdir.yaml
   - nvoperator.yaml
   - open-webui.yaml
+  - payment-processor.yaml
   - rook.yaml
   - rook-release.yaml
   - technitium.yaml
   - traefik.yaml
-  - immich.yaml
   - velero.yaml
