@@ -5,7 +5,7 @@ variable "proxmox_endpoint" {
 }
 
 variable "proxmox_api_token_id" {
-  description = "Proxmox API token ID, e.g. terraform@pam!tf"
+  description = "Proxmox API token ID, e.g. root@pam!tf"
   type        = string
   sensitive   = true
 }
@@ -22,50 +22,98 @@ variable "proxmox_node" {
   default     = "pve"
 }
 
-variable "vm_name" {
-  description = "VM name as shown in Proxmox"
-  type        = string
-  default     = "talos-cp-03"
-}
-
-variable "vm_id" {
-  description = "Proxmox VM ID (must be unique in the cluster)"
-  type        = number
-  default     = 300
-}
-
 variable "datastore_id" {
-  description = "Proxmox storage pool for the VM disk (e.g. local-lvm, local)"
+  description = "Proxmox storage pool for VM disks (must support disk images, e.g. local-lvm)"
   type        = string
   default     = "local-lvm"
 }
 
-variable "network_bridge" {
-  description = "Proxmox network bridge for the VM NIC"
-  type        = string
-  default     = "vmbr0"
-}
-
-variable "talos_factory_hash" {
-  description = "Talos image factory schematic hash for the custom image"
-  type        = string
-  default     = "3abf06e1d81e509d779dc256f9feae6cd6d82c69337c661cbfc383a92594faf5"
-}
-
-variable "talos_version" {
-  description = "Talos version to install, used to construct the factory ISO URL (e.g. v1.12.6)"
-  type        = string
-  default     = "v1.12.6"
-}
-
 variable "iso_datastore_id" {
-  description = "Proxmox storage pool that supports ISO content type (e.g. local, not local-lvm)"
+  description = "Proxmox storage pool for ISO downloads (must support iso content, e.g. local)"
   type        = string
   default     = "local"
 }
 
-variable "vm_ip" {
-  description = "Static IP of the new control plane node. Set in talos-infra/controlplane.yaml, not managed by Terraform. Used only in post-provision output."
+variable "network_bridge" {
+  description = "Proxmox network bridge for all VM NICs"
   type        = string
-  default     = "192.168.1.103"
+  default     = "vmbr0"
+}
+
+variable "talos_version" {
+  description = "Talos version for all nodes, used to construct factory ISO URLs (e.g. v1.13.0)"
+  type        = string
+  default     = "v1.13.0"
+}
+
+# --- Control plane nodes ---
+
+variable "control_planes" {
+  description = "Map of control plane nodes. Key becomes the VM name suffix (e.g. 'cp-03' → 'talos-cp-03'). ip is informational only (set in talos-infra/controlplane.yaml)."
+  type = map(object({
+    ip    = string
+    vm_id = number
+  }))
+  default = {
+    cp-03 = { ip = "192.168.1.103", vm_id = 300 }
+  }
+}
+
+variable "control_plane_cpu" {
+  description = "Number of vCPU cores for each control plane node"
+  type        = number
+  default     = 4
+}
+
+variable "control_plane_memory" {
+  description = "RAM in MB for each control plane node"
+  type        = number
+  default     = 8192
+}
+
+variable "control_plane_disk" {
+  description = "Disk size in GB for each control plane node"
+  type        = number
+  default     = 100
+}
+
+variable "control_plane_factory_hash" {
+  description = "Talos image factory schematic hash for control plane nodes"
+  type        = string
+  default     = "3abf06e1d81e509d779dc256f9feae6cd6d82c69337c661cbfc383a92594faf5"
+}
+
+# --- Worker nodes ---
+
+variable "workers" {
+  description = "Map of worker nodes. Key becomes the VM name suffix (e.g. 'w-01' → 'talos-w-01'). ip is informational only (set in talos-infra/worker.yaml)."
+  type = map(object({
+    ip    = string
+    vm_id = number
+  }))
+  default = {}
+}
+
+variable "worker_cpu" {
+  description = "Number of vCPU cores for each worker node"
+  type        = number
+  default     = 4
+}
+
+variable "worker_memory" {
+  description = "RAM in MB for each worker node"
+  type        = number
+  default     = 8192
+}
+
+variable "worker_disk" {
+  description = "Disk size in GB for each worker node"
+  type        = number
+  default     = 100
+}
+
+variable "worker_factory_hash" {
+  description = "Talos image factory schematic hash for worker nodes. Must be set when workers map is non-empty."
+  type        = string
+  default     = ""
 }
