@@ -1,23 +1,44 @@
 # Copy this file to terraform.tfvars and fill in your values.
-# terraform.tfvars is gitignored - never commit secrets.
+# terraform.tfvars is gitignored — never commit secrets.
 
 proxmox_endpoint         = "https://192.168.1.171:8006/"
-proxmox_api_token_id     = "terraform@pam!tf"
+proxmox_api_token_id     = "root@pam!tf"
 proxmox_api_token_secret = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
 # Match the node name shown in Proxmox UI > Datacenter (left panel)
-proxmox_node = "pve"
+proxmox_node     = "pve"
+datastore_id     = "local-lvm"
+iso_datastore_id = "local"
+network_bridge   = "vmbr0"
 
-vm_name        = "talos-cp-03"
-vm_id          = 300
-datastore_id   = "local-lvm"
-network_bridge = "vmbr0"
+talos_version = "v1.13.0"
 
-talos_factory_hash = "3abf06e1d81e509d779dc256f9feae6cd6d82c69337c661cbfc383a92594faf5"
-talos_version      = "v1.12.6"
+# --- Control plane nodes ---
+# Key = name suffix → VM will be named "talos-<key>"
+# ip is informational only; set statically in talos-infra/controlplane.yaml
+control_plane_cpu    = 4
+control_plane_memory = 8192
+control_plane_disk   = 100
 
-# Storage pool for the ISO download — must support 'iso' content type.
-# 'local-lvm' does NOT support ISOs; use 'local' or another directory-backed store.
-iso_datastore_id   = "local"
+control_plane_factory_hash = "3abf06e1d81e509d779dc256f9feae6cd6d82c69337c661cbfc383a92594faf5"
 
-vm_ip          = "192.168.1.103"
+control_planes = {
+  cp-03 = { ip = "192.168.1.103", vm_id = 300 }
+  # cp-04 = { ip = "192.168.1.104", vm_id = 301 }
+  # cp-05 = { ip = "192.168.1.105", vm_id = 302 }
+}
+
+# --- Worker nodes ---
+# Leave workers = {} and worker_factory_hash = "" if no workers yet.
+# worker_factory_hash must be set when workers map is non-empty.
+worker_cpu    = 4
+worker_memory = 8192
+worker_disk   = 100
+
+worker_factory_hash = ""
+
+workers = {}
+# workers = {
+#   w-01 = { ip = "192.168.1.201", vm_id = 401 }
+#   w-02 = { ip = "192.168.1.202", vm_id = 402 }
+# }
