@@ -80,11 +80,8 @@ resource "proxmox_virtual_environment_vm" "talos_controlplane" {
     type = "l26" # Linux 2.6+ kernel
   }
 
-  # Cloud-init / serial console for visibility during boot
-  serial_device {}
-
   vga {
-    type = "serial0"
+    type = "std"
   }
 
   lifecycle {
