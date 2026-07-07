@@ -4,58 +4,67 @@ provider "proxmox" {
   insecure  = true # Set to false if you have a valid TLS cert on Proxmox
 }
 
-# Download the Talos factory ISO into Proxmox storage.
-# Proxmox fetches it directly from the factory — no manual upload needed.
-# Re-running terraform apply will not re-download if the file already exists.
-resource "proxmox_virtual_environment_download_file" "talos_iso" {
+# --- ISO downloads ---
+
+# Control plane ISO: always downloaded (control_planes map is never empty).
+resource "proxmox_virtual_environment_download_file" "talos_iso_controlplane" {
   node_name    = var.proxmox_node
   content_type = "iso"
   datastore_id = var.iso_datastore_id
-  file_name    = "talos-${var.talos_factory_hash}.iso"
-  url          = "https://factory.talos.dev/image/${var.talos_factory_hash}/${var.talos_version}/metal-amd64.iso"
+  file_name    = "talos-cp-${var.control_plane_factory_hash}.iso"
+  url          = "https://factory.talos.dev/image/${var.control_plane_factory_hash}/${var.talos_version}/metal-amd64.iso"
   overwrite    = false
 }
 
-resource "proxmox_virtual_environment_vm" "talos_controlplane" {
-  name      = var.vm_name
+# Worker ISO: only downloaded when workers map is non-empty and hash is set.
+resource "proxmox_virtual_environment_download_file" "talos_iso_worker" {
+  count = length(var.workers) > 0 && var.worker_factory_hash != "" ? 1 : 0
+
+  node_name    = var.proxmox_node
+  content_type = "iso"
+  datastore_id = var.iso_datastore_id
+  file_name    = "talos-w-${var.worker_factory_hash}.iso"
+  url          = "https://factory.talos.dev/image/${var.worker_factory_hash}/${var.talos_version}/metal-amd64.iso"
+  overwrite    = false
+}
+
+# --- Control plane VMs ---
+
+resource "proxmox_virtual_environment_vm" "control_plane" {
+  for_each = var.control_planes
+
+  name      = "talos-${each.key}"
   node_name = var.proxmox_node
-  vm_id     = var.vm_id
+  vm_id     = each.value.vm_id
 
-  description = "Talos control plane node - grendel2 cluster. Image factory: ${var.talos_factory_hash}"
+  description = "Talos control plane - grendel2 cluster. Node: ${each.key} IP: ${each.value.ip}"
 
-  # UEFI required for Talos secure boot / UKI
-  bios = "ovmf"
-
+  bios    = "ovmf"
   machine = "q35"
 
-  # Boot from ISO on first boot; Talos installer writes bootloader to scsi0.
-  # Subsequent reboots go straight to disk — the CDROM is ignored once installed.
+  # Boot from ISO on first boot; Talos writes bootloader to scsi0 on install.
   boot_order = ["ide2", "scsi0"]
 
-  # Talos factory ISO attached as CDROM on ide2.
-  # q35 supports ide0 and ide2 only; ide2 is the conventional CDROM slot.
   cdrom {
-    file_id   = proxmox_virtual_environment_download_file.talos_iso.id
+    file_id   = proxmox_virtual_environment_download_file.talos_iso_controlplane.id
     interface = "ide2"
   }
 
   cpu {
-    cores = 4
+    cores = var.control_plane_cpu
     type  = "x86-64-v2-AES"
   }
 
   memory {
-    dedicated = 8192
+    dedicated = var.control_plane_memory
   }
 
-  # EFI disk required when bios = "ovmf"
   efi_disk {
     datastore_id = var.datastore_id
     file_format  = "raw"
     type         = "4m"
   }
 
-  # TPM state disk (optional but recommended for Talos)
   tpm_state {
     datastore_id = var.datastore_id
     version      = "v2.0"
@@ -64,20 +73,19 @@ resource "proxmox_virtual_environment_vm" "talos_controlplane" {
   disk {
     datastore_id = var.datastore_id
     interface    = "scsi0"
-    size         = 100
+    size         = var.control_plane_disk
     file_format  = "raw"
     ssd          = true
-    discard      = "on"      # enables TRIM/discard passthrough (valid values: "on", "ignore")
+    discard      = "on"
   }
 
   network_device {
-    bridge  = var.network_bridge
-    model   = "virtio"
-    # mac_address is auto-assigned by Proxmox; Talos ignores it during PXE
+    bridge = var.network_bridge
+    model  = "virtio"
   }
 
   operating_system {
-    type = "l26" # Linux 2.6+ kernel
+    type = "l26"
   }
 
   vga {
@@ -85,7 +93,80 @@ resource "proxmox_virtual_environment_vm" "talos_controlplane" {
   }
 
   lifecycle {
-    # Prevent accidental destruction of a running cluster node
     prevent_destroy = true
+  }
+}
+
+# --- Worker VMs ---
+
+resource "proxmox_virtual_environment_vm" "worker" {
+  for_each = var.workers
+
+  name      = "talos-${each.key}"
+  node_name = var.proxmox_node
+  vm_id     = each.value.vm_id
+
+  description = "Talos worker - grendel2 cluster. Node: ${each.key} IP: ${each.value.ip}"
+
+  bios    = "ovmf"
+  machine = "q35"
+
+  boot_order = ["ide2", "scsi0"]
+
+  cdrom {
+    file_id   = proxmox_virtual_environment_download_file.talos_iso_worker[0].id
+    interface = "ide2"
+  }
+
+  cpu {
+    cores = var.worker_cpu
+    type  = "x86-64-v2-AES"
+  }
+
+  memory {
+    dedicated = var.worker_memory
+  }
+
+  efi_disk {
+    datastore_id = var.datastore_id
+    file_format  = "raw"
+    type         = "4m"
+  }
+
+  tpm_state {
+    datastore_id = var.datastore_id
+    version      = "v2.0"
+  }
+
+  disk {
+    datastore_id = var.datastore_id
+    interface    = "scsi0"
+    size         = var.worker_disk
+    file_format  = "raw"
+    ssd          = true
+    discard      = "on"
+  }
+
+  network_device {
+    bridge = var.network_bridge
+    model  = "virtio"
+  }
+
+  operating_system {
+    type = "l26"
+  }
+
+  vga {
+    type = "std"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  # Guard: fail clearly if workers are declared but no hash provided.
+  precondition {
+    condition     = var.worker_factory_hash != ""
+    error_message = "worker_factory_hash must be set when the workers map is non-empty."
   }
 }
