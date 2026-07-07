@@ -4,6 +4,18 @@ provider "proxmox" {
   insecure  = true # Set to false if you have a valid TLS cert on Proxmox
 }
 
+# Download the Talos factory ISO into Proxmox storage.
+# Proxmox fetches it directly from the factory — no manual upload needed.
+# Re-running terraform apply will not re-download if the file already exists.
+resource "proxmox_virtual_environment_download_file" "talos_iso" {
+  node_name    = var.proxmox_node
+  content_type = "iso"
+  datastore_id = var.iso_datastore_id
+  file_name    = "talos-${var.talos_factory_hash}.iso"
+  url          = "https://factory.talos.dev/image/${var.talos_factory_hash}/${var.talos_version}/metal-amd64.iso"
+  overwrite    = false
+}
+
 resource "proxmox_virtual_environment_vm" "talos_controlplane" {
   name      = var.vm_name
   node_name = var.proxmox_node
@@ -16,10 +28,16 @@ resource "proxmox_virtual_environment_vm" "talos_controlplane" {
 
   machine = "q35"
 
-  # Boot order: network first so Talos PXE-installs on first boot.
-  # After installation Talos rewrites the bootloader to disk; subsequent
-  # reboots will boot from disk without PXE.
-  boot_order = ["net0", "scsi0"]
+  # Boot from ISO on first boot; Talos installer writes bootloader to scsi0.
+  # Subsequent reboots go straight to disk — the CDROM is ignored once installed.
+  boot_order = ["ide2", "scsi0"]
+
+  # Talos factory ISO attached as CDROM on ide2.
+  # q35 supports ide0 and ide2 only; ide2 is the conventional CDROM slot.
+  cdrom {
+    file_id   = proxmox_virtual_environment_download_file.talos_iso.id
+    interface = "ide2"
+  }
 
   cpu {
     cores = 4
@@ -58,10 +76,6 @@ resource "proxmox_virtual_environment_vm" "talos_controlplane" {
     # mac_address is auto-assigned by Proxmox; Talos ignores it during PXE
   }
 
-  # PXE boot is enabled via boot_order = ["net0", "scsi0"] above.
-  # Your network DHCP/iPXE server must chainload:
-  #   https://pxe.factory.talos.dev/pxe/3abf06e1d81e509d779dc256f9feae6cd6d82c69337c661cbfc383a92594faf5
-  # See terraform.tfvars.example and plan docs for ISO fallback instructions.
   operating_system {
     type = "l26" # Linux 2.6+ kernel
   }
