@@ -1,7 +1,6 @@
 variable "proxmox_endpoint" {
-  description = "Proxmox API endpoint URL (include trailing slash)"
+  description = "Proxmox API endpoint URL (include trailing slash, e.g. https://192.168.1.171:8006/)"
   type        = string
-  default     = "https://192.168.1.171:8006/"
 }
 
 variable "proxmox_api_token_id" {
@@ -78,7 +77,7 @@ variable "control_plane_disk" {
 }
 
 variable "control_plane_factory_hash" {
-  description = "Talos image factory schematic hash for control plane nodes"
+  description = "Talos image factory schematic hash for control plane nodes. Default hash corresponds to the grendel2 cluster schematic — regenerate at factory.talos.dev if changing extensions."
   type        = string
   default     = "3abf06e1d81e509d779dc256f9feae6cd6d82c69337c661cbfc383a92594faf5"
 }
@@ -113,7 +112,7 @@ variable "worker_disk" {
 }
 
 variable "worker_factory_hash" {
-  description = "Talos image factory schematic hash for worker nodes. Must be set when workers map is non-empty."
+  description = "Talos image factory schematic hash for worker nodes. Required when workers map is non-empty — enforced via precondition on the worker VM resource."
   type        = string
   default     = ""
 }
