@@ -261,13 +261,13 @@ data "talos_machine_configuration" "worker" {
 
 resource "local_sensitive_file" "control_plane_config" {
   for_each = var.control_planes
-  content  = data.talos_machine_configuration.control_plane[each.key].machine_config
+  content  = data.talos_machine_configuration.control_plane[each.key].machine_configuration
   filename = "${path.root}/generated/talos-${each.key}.yaml"
 }
 
 resource "local_sensitive_file" "worker_config" {
   for_each = var.workers
-  content  = data.talos_machine_configuration.worker[each.key].machine_config
+  content  = data.talos_machine_configuration.worker[each.key].machine_configuration
   filename = "${path.root}/generated/talos-${each.key}.yaml"
 }
 
