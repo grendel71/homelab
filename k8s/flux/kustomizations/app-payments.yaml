@@ -7,10 +7,12 @@ spec:
   interval: 10m
   dependsOn:
     - name: namespace
+    - name: cloudnative-pg
   sourceRef:
     kind: GitRepository
-    name: flux-system
-  path: ./k8s/apps/payments
+    name: payment-processor
+    namespace: flux-system
+  path: ./k8s
   prune: true
   timeout: 5m
   wait: true
@@ -18,4 +20,3 @@ spec:
     provider: sops
     secretRef:
       name: sops-age
----
