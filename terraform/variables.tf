@@ -39,6 +39,12 @@ variable "network_bridge" {
   default     = "vmbr0"
 }
 
+variable "network_interface" {
+  description = "Network interface name for Talos static IP configuration (e.g. eth0)"
+  type        = string
+  default     = "eth0"
+}
+
 variable "talos_version" {
   description = "Talos version for all nodes, used to construct factory ISO URLs (e.g. v1.13.0)"
   type        = string
@@ -50,8 +56,10 @@ variable "talos_version" {
 variable "control_planes" {
   description = "Map of control plane nodes. Key becomes the VM name suffix (e.g. 'cp-03' → 'talos-cp-03'). ip is informational only (set in talos-infra/controlplane.yaml)."
   type = map(object({
-    ip    = string
-    vm_id = number
+    ip      = string
+    vm_id   = number
+    gateway = optional(string, "192.168.1.1")
+    netmask = optional(number, 24)
   }))
   default = {
     cp-03 = { ip = "192.168.1.103", vm_id = 300 }
@@ -87,8 +95,10 @@ variable "control_plane_factory_hash" {
 variable "workers" {
   description = "Map of worker nodes. Key becomes the VM name suffix (e.g. 'w-01' → 'talos-w-01'). ip is informational only (set in talos-infra/worker.yaml)."
   type = map(object({
-    ip    = string
-    vm_id = number
+    ip      = string
+    vm_id   = number
+    gateway = optional(string, "192.168.1.1")
+    netmask = optional(number, 24)
   }))
   default = {}
 }
