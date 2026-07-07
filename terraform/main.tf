@@ -175,3 +175,120 @@ resource "proxmox_virtual_environment_vm" "worker" {
     }
   }
 }
+
+# --- Talos machine config generation ---
+
+provider "talos" {}
+
+# Extract existing cluster secrets from the current machine config YAML.
+locals {
+  existing_config = yamldecode(file("${path.root}/../talos-infra/controlplane.yaml"))
+}
+
+data "talos_machine_secrets" "this" {
+  talos_version = var.talos_version
+}
+
+# --- Control plane machine configs ---
+
+data "talos_machine_configuration" "control_plane" {
+  for_each = var.control_planes
+
+  cluster_name     = local.existing_config.cluster.clusterName
+  cluster_endpoint = local.existing_config.cluster.controlPlane.endpoint
+  machine_type     = "controlplane"
+  talos_version    = var.talos_version
+  machine_secrets  = data.talos_machine_secrets.this.machine_secrets
+
+  config_patches = [
+    yamlencode({
+      machine = {
+        network = {
+          hostname = "talos-${each.key}"
+          interfaces = [{
+            interface = var.network_interface
+            addresses = ["${each.value.ip}/${each.value.netmask}"]
+            routes = [{
+              network = "0.0.0.0/0"
+              gateway = each.value.gateway
+            }]
+          }]
+        }
+        install = {
+          disk = "/dev/sda"
+          image = "ghcr.io/siderolabs/installer:${var.talos_version}"
+        }
+      }
+    })
+  ]
+}
+
+# --- Worker machine configs ---
+
+data "talos_machine_configuration" "worker" {
+  for_each = var.workers
+
+  cluster_name     = local.existing_config.cluster.clusterName
+  cluster_endpoint = local.existing_config.cluster.controlPlane.endpoint
+  machine_type     = "worker"
+  talos_version    = var.talos_version
+  machine_secrets  = data.talos_machine_secrets.this.machine_secrets
+
+  config_patches = [
+    yamlencode({
+      machine = {
+        network = {
+          hostname = "talos-${each.key}"
+          interfaces = [{
+            interface = var.network_interface
+            addresses = ["${each.value.ip}/${each.value.netmask}"]
+            routes = [{
+              network = "0.0.0.0/0"
+              gateway = each.value.gateway
+            }]
+          }]
+        }
+        install = {
+          disk = "/dev/sda"
+          image = "ghcr.io/siderolabs/installer:${var.talos_version}"
+        }
+      }
+    })
+  ]
+}
+
+# --- Write generated configs to disk ---
+
+resource "local_sensitive_file" "control_plane_config" {
+  for_each = var.control_planes
+  content  = data.talos_machine_configuration.control_plane[each.key].machine_config
+  filename = "${path.root}/generated/talos-${each.key}.yaml"
+}
+
+resource "local_sensitive_file" "worker_config" {
+  for_each = var.workers
+  content  = data.talos_machine_configuration.worker[each.key].machine_config
+  filename = "${path.root}/generated/talos-${each.key}.yaml"
+}
+
+# --- Apply machine configs to nodes (runs once per node, then user manages manually) ---
+
+resource "null_resource" "apply_control_plane_config" {
+  for_each = var.control_planes
+
+  depends_on = [proxmox_virtual_environment_vm.control_plane]
+
+  provisioner "local-exec" {
+    command = "talosctl apply-config --insecure --nodes ${each.value.ip} --file ${path.root}/generated/talos-${each.key}.yaml"
+  }
+}
+
+resource "null_resource" "apply_worker_config" {
+  for_each = var.workers
+
+  depends_on = [proxmox_virtual_environment_vm.worker]
+
+  provisioner "local-exec" {
+    command = "talosctl apply-config --insecure --nodes ${each.value.ip} --file ${path.root}/generated/talos-${each.key}.yaml"
+  }
+}
