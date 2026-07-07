@@ -182,10 +182,10 @@ provider "talos" {}
 
 # Extract existing cluster secrets from the current machine config YAML.
 locals {
-  existing_config = yamldecode(file("${path.root}/../talos-infra/controlplane.yaml"))
+  existing_config = yamldecode(split("---", file("${path.root}/../talos-infra/controlplane.yaml"))[0])
 }
 
-data "talos_machine_secrets" "this" {
+resource "talos_machine_secrets" "this" {
   talos_version = var.talos_version
 }
 
@@ -198,7 +198,7 @@ data "talos_machine_configuration" "control_plane" {
   cluster_endpoint = local.existing_config.cluster.controlPlane.endpoint
   machine_type     = "controlplane"
   talos_version    = var.talos_version
-  machine_secrets  = data.talos_machine_secrets.this.machine_secrets
+  machine_secrets  = talos_machine_secrets.this.machine_secrets
 
   config_patches = [
     yamlencode({
@@ -232,7 +232,7 @@ data "talos_machine_configuration" "worker" {
   cluster_endpoint = local.existing_config.cluster.controlPlane.endpoint
   machine_type     = "worker"
   talos_version    = var.talos_version
-  machine_secrets  = data.talos_machine_secrets.this.machine_secrets
+  machine_secrets  = talos_machine_secrets.this.machine_secrets
 
   config_patches = [
     yamlencode({
