@@ -94,6 +94,11 @@ resource "proxmox_virtual_environment_vm" "control_plane" {
 
   lifecycle {
     prevent_destroy = true
+
+    precondition {
+      condition     = var.control_plane_factory_hash != ""
+      error_message = "control_plane_factory_hash must be set."
+    }
   }
 }
 
