@@ -19,3 +19,4 @@ terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.backup
 terraform/generated/
+scripts/pappwiki-migration/__pycache__/

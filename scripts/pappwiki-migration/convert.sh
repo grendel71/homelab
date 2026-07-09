@@ -16,8 +16,9 @@ command -v pandoc >/dev/null 2>&1 || { echo "ERROR: pandoc not found in PATH"; e
 mkdir -p "$OUT"
 : > "$REPORT"
 
-MIGRATION_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" \
-python3 - "$XML" "$OUT" "$REPORT" << 'PYEOF'
+MIGRATION_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON="${PYTHON:-$(command -v python3 2>/dev/null || echo 'nix run nixpkgs#python3 --')}"
+MIGRATION_SCRIPT_DIR="$MIGRATION_SCRIPT_DIR" $PYTHON - "$XML" "$OUT" "$REPORT" << 'PYEOF'
 import sys, re, os, subprocess, xml.etree.ElementTree as ET
 import importlib.util, pathlib
 

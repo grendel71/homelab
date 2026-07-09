@@ -8,25 +8,92 @@ Usage:
                     --images ~/pappwiki-migration-work/images
 
 Idempotent: pages/assets that already exist are skipped.
+Uses only stdlib (urllib) — no third-party packages needed.
 """
-import argparse, os, sys, re, pathlib, requests, json, time
+import argparse, os, sys, re, pathlib, json, time
+import urllib.request, urllib.error
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+import mimetypes, uuid
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from normalize import normalize_path, normalize_asset_name
+
+# ---------------------------------------------------------------------------
+# HTTP helpers (stdlib urllib, no requests)
+# ---------------------------------------------------------------------------
+
+def http_post_json(url: str, token: str, payload: dict, timeout: int = 30) -> dict:
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        body = json.loads(resp.read().decode())
+    return body
+
+def http_post_multipart(url: str, token: str, fields: dict, files: dict, timeout: int = 60) -> tuple:
+    """
+    Simple multipart/form-data POST using stdlib only.
+    fields: {name: str_value}
+    files:  {name: (filename, bytes_or_path, content_type)}
+    Returns (status_code, response_body_str).
+    """
+    boundary = uuid.uuid4().hex
+    ctype = f"multipart/form-data; boundary={boundary}"
+
+    body_parts = []
+    for name, value in fields.items():
+        body_parts.append(
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+            f"{value}\r\n"
+        )
+    for name, (filename, file_data, file_ctype) in files.items():
+        if isinstance(file_data, (str, pathlib.Path)):
+            with open(file_data, "rb") as f:
+                file_data = f.read()
+        header = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'
+            f"Content-Type: {file_ctype}\r\n\r\n"
+        )
+        body_parts.append(header.encode() + file_data + b"\r\n")
+
+    closing = f"--{boundary}--\r\n"
+    raw = b""
+    for part in body_parts:
+        raw += part if isinstance(part, bytes) else part.encode()
+    raw += closing.encode()
+
+    req = urllib.request.Request(
+        url,
+        data=raw,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": ctype,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read().decode(errors="replace")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode(errors="replace")
 
 # ---------------------------------------------------------------------------
 # GraphQL helpers
 # ---------------------------------------------------------------------------
 
 def gql(url: str, token: str, query: str, variables: dict = None) -> dict:
-    resp = requests.post(
-        f"{url}/graphql",
-        json={"query": query, "variables": variables or {}},
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    body = resp.json()
+    payload = {"query": query, "variables": variables or {}}
+    body = http_post_json(f"{url}/graphql", token, payload)
     if "errors" in body:
         raise RuntimeError(f"GraphQL error: {body['errors']}")
     return body["data"]
@@ -37,11 +104,11 @@ query { pages { list { path } } }
 
 CREATE_PAGE_MUTATION = """
 mutation CreatePage($content: String!, $description: String!, $editor: String!,
-                    $isPublished: Boolean!, $locale: String!, $path: String!,
+                    $isPublished: Boolean!, $isPrivate: Boolean!, $locale: String!, $path: String!,
                     $tags: [String]!, $title: String!) {
   pages {
     create(content: $content, description: $description, editor: $editor,
-           isPublished: $isPublished, locale: $locale, path: $path,
+           isPublished: $isPublished, isPrivate: $isPrivate, locale: $locale, path: $path,
            tags: $tags, title: $title) {
       responseResult { succeeded errorCode message }
       page { id }
@@ -53,22 +120,6 @@ mutation CreatePage($content: String!, $description: String!, $editor: String!,
 # ---------------------------------------------------------------------------
 # Asset upload
 # ---------------------------------------------------------------------------
-
-def upload_asset(url: str, token: str, filepath: pathlib.Path, folder_id: int, upload_name: str = None) -> bool:
-    """Upload a single file as a Wiki.js asset. Returns True on success."""
-    name = upload_name or filepath.name
-    with open(filepath, 'rb') as f:
-        resp = requests.post(
-            f"{url}/u",
-            files={"mediaUpload": (name, f)},
-            data={"mediaUpload": json.dumps({"folderId": folder_id})},
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=60,
-        )
-    if resp.status_code == 200:
-        return True
-    print(f"  WARN: asset upload returned {resp.status_code} for {filepath.name}: {resp.text[:200]}")
-    return False
 
 LIST_ASSET_FOLDERS_QUERY = """
 query { assets { folders(parentFolderId: 0) { id name } } }
@@ -92,8 +143,23 @@ def get_or_create_images_folder(url: str, token: str) -> int:
             return folder["id"]
     raise RuntimeError("Could not create or find 'images' asset folder")
 
+def upload_asset(url: str, token: str, filepath: pathlib.Path, folder_id: int, upload_name: str = None) -> bool:
+    """Upload a single file as a Wiki.js asset. Returns True on success."""
+    name = upload_name or filepath.name
+    mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    status, body = http_post_multipart(
+        f"{url}/u",
+        token,
+        fields={"mediaUpload": json.dumps({"folderId": folder_id})},
+        files={"mediaUpload": (name, filepath, mime)},
+    )
+    if status == 200:
+        return True
+    print(f"  WARN: asset upload returned {status} for {filepath.name}: {body[:200]}")
+    return False
+
 # ---------------------------------------------------------------------------
-# Main
+# Front-matter parser
 # ---------------------------------------------------------------------------
 
 def parse_frontmatter(text: str):
@@ -109,6 +175,10 @@ def parse_frontmatter(text: str):
                 title = m.group(1)
             tags = re.findall(r'^\s*-\s+(.+)$', fm, re.MULTILINE)
     return title, [t.strip() for t in tags], body.strip()
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def main():
     ap = argparse.ArgumentParser()
@@ -170,7 +240,6 @@ def main():
 
     page_ok = page_skip = page_fail = 0
     for md in md_files:
-        rel = md.relative_to(pages_dir)
         text = md.read_text()
         title, tags, body = parse_frontmatter(text)
         path = normalize_path(title)   # consistent with how convert.sh named the file
@@ -190,6 +259,7 @@ def main():
                 "description": "",
                 "editor": "markdown",
                 "isPublished": True,
+                "isPrivate": False,
                 "locale": "en",
                 "path": path,
                 "tags": tags,
