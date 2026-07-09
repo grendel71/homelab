@@ -54,12 +54,13 @@ mutation CreatePage($content: String!, $description: String!, $editor: String!,
 # Asset upload
 # ---------------------------------------------------------------------------
 
-def upload_asset(url: str, token: str, filepath: pathlib.Path, folder_id: int) -> bool:
+def upload_asset(url: str, token: str, filepath: pathlib.Path, folder_id: int, upload_name: str = None) -> bool:
     """Upload a single file as a Wiki.js asset. Returns True on success."""
+    name = upload_name or filepath.name
     with open(filepath, 'rb') as f:
         resp = requests.post(
             f"{url}/u",
-            files={"mediaUpload": (filepath.name, f)},
+            files={"mediaUpload": (name, f)},
             data={"mediaUpload": json.dumps({"folderId": folder_id})},
             headers={"Authorization": f"Bearer {token}"},
             timeout=60,
@@ -135,19 +136,15 @@ def main():
                    and p.suffix.lower() in {".png",".jpg",".jpeg",".gif",".svg",".webp",".tiff",".tif"}]
     print(f"    {len(image_files)} image files found")
 
-    asset_ok = asset_skip = asset_fail = 0
+    asset_ok = asset_fail = 0
     for img in sorted(image_files):
         new_name = normalize_asset_name(img.name)
         if args.dry_run:
             print(f"    [dry] would upload {img.name} → images/{new_name}")
             asset_ok += 1
             continue
-        # Rename to normalised name in a temp location
-        tmp = img.parent / new_name
         try:
-            if not tmp.exists():
-                img.rename(tmp)
-            success = upload_asset(url, token, tmp, folder_id)
+            success = upload_asset(url, token, img, folder_id, upload_name=new_name)
             if success:
                 asset_ok += 1
             else:
@@ -157,7 +154,7 @@ def main():
             asset_fail += 1
         time.sleep(0.05)   # gentle rate-limit
 
-    print(f"    assets: {asset_ok} uploaded, {asset_fail} failed, {asset_skip} skipped")
+    print(f"    assets: {asset_ok} uploaded, {asset_fail} failed")
 
     # ------------------------------------------------------------------
     # Phase 2: pages

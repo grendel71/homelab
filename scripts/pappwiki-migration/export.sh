@@ -6,7 +6,7 @@ CONTAINER_NAME="pappwiki-mariadb-restore"
 MW_CONTAINER="pappwiki-mw-export"
 
 # Verify restore container is up
-if ! docker inspect "$CONTAINER_NAME" &>/dev/null; then
+if ! docker ps --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
   echo "ERROR: Restore container '$CONTAINER_NAME' is not running. Run restore.sh first."
   exit 1
 fi

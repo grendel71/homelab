@@ -16,34 +16,28 @@ command -v pandoc >/dev/null 2>&1 || { echo "ERROR: pandoc not found in PATH"; e
 mkdir -p "$OUT"
 : > "$REPORT"
 
+MIGRATION_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" \
 python3 - "$XML" "$OUT" "$REPORT" << 'PYEOF'
 import sys, re, os, subprocess, xml.etree.ElementTree as ET
 import importlib.util, pathlib
 
-# Load normalize.py from the same directory as this script
-_script_dir = pathlib.Path(os.environ.get('BASH_SOURCE_DIR', os.getcwd()))
-_normalize_candidates = [
-    pathlib.Path(__file__).parent / "normalize.py" if '__file__' in dir() else None,
-    _script_dir / "normalize.py",
-    pathlib.Path(sys.argv[0]).parent / "normalize.py",
-]
+# Load normalize.py — MIGRATION_SCRIPT_DIR is set by the calling shell
+_script_dir = pathlib.Path(os.environ.get('MIGRATION_SCRIPT_DIR', ''))
 _normalize_path_file = None
-for _c in _normalize_candidates:
-    if _c and _c.exists():
-        _normalize_path_file = _c
-        break
-if _normalize_path_file is None:
-    # Last resort: search upward from cwd
+if _script_dir and (_script_dir / 'normalize.py').exists():
+    _normalize_path_file = _script_dir / 'normalize.py'
+else:
+    # Fallback: search upward from cwd for scripts/pappwiki-migration/normalize.py
     for _d in [pathlib.Path.cwd()] + list(pathlib.Path.cwd().parents):
-        _candidate = _d / "scripts" / "pappwiki-migration" / "normalize.py"
+        _candidate = _d / 'scripts' / 'pappwiki-migration' / 'normalize.py'
         if _candidate.exists():
             _normalize_path_file = _candidate
             break
 if _normalize_path_file is None:
-    print("ERROR: cannot find normalize.py", file=sys.stderr)
+    print('ERROR: cannot find normalize.py', file=sys.stderr)
     sys.exit(1)
 
-spec = importlib.util.spec_from_file_location("normalize", _normalize_path_file)
+spec = importlib.util.spec_from_file_location('normalize', _normalize_path_file)
 normalize_mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(normalize_mod)
 normalize_path = normalize_mod.normalize_path

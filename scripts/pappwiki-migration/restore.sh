@@ -13,8 +13,10 @@ tar -xzf "$DUMP_DIR/wikidata.tgz" \
   -C "$WORK_DIR" \
   --strip-components=1 \
   "wiki/images" \
-  "wiki/LocalSettings.php" 2>/dev/null || true
+  "wiki/LocalSettings.php"
 # wikidata.tgz extracts wiki/images/ → $WORK_DIR/images/
+[ -f "$WORK_DIR/LocalSettings.php" ] || { echo "ERROR: LocalSettings.php not extracted from wikidata.tgz"; exit 1; }
+[ -d "$WORK_DIR/images" ] || { echo "ERROR: wiki/images not extracted from wikidata.tgz"; exit 1; }
 
 echo "==> Starting MariaDB container: $CONTAINER_NAME"
 docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
