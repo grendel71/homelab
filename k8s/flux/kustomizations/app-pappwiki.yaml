@@ -7,7 +7,7 @@ spec:
   interval: 10m
   dependsOn:
     - name: namespace
-    - name: cnpg
+    - name: cloudnative-pg
     - name: storage
   sourceRef:
     kind: GitRepository
