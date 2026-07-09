@@ -99,7 +99,22 @@ def gql(url: str, token: str, query: str, variables: dict = None) -> dict:
     return body["data"]
 
 LIST_PAGES_QUERY = """
-query { pages { list { path } } }
+query { pages { list { id path } } }
+"""
+
+UPDATE_PAGE_MUTATION = """
+mutation UpdatePage($id: Int!, $content: String!, $description: String!, $editor: String!,
+                    $isPublished: Boolean!, $isPrivate: Boolean!, $locale: String!,
+                    $path: String!, $tags: [String]!, $title: String!) {
+  pages {
+    update(id: $id, content: $content, description: $description, editor: $editor,
+           isPublished: $isPublished, isPrivate: $isPrivate, locale: $locale,
+           path: $path, tags: $tags, title: $title) {
+      responseResult { succeeded errorCode message }
+      page { id }
+    }
+  }
+}
 """
 
 CREATE_PAGE_MUTATION = """
@@ -187,6 +202,7 @@ def main():
     ap.add_argument("--pages", required=True, help="Directory of converted .md files")
     ap.add_argument("--images", required=True, help="Directory of extracted wiki images")
     ap.add_argument("--dry-run", action="store_true", help="Print actions without executing")
+    ap.add_argument("--update", action="store_true", help="Update existing pages instead of skipping them")
     args = ap.parse_args()
 
     url = args.url.rstrip("/")
@@ -231,9 +247,9 @@ def main():
     # ------------------------------------------------------------------
     print("==> Phase 2: creating pages")
     if not args.dry_run:
-        existing = {p["path"] for p in gql(url, token, LIST_PAGES_QUERY)["pages"]["list"]}
+        existing = {p["path"]: p["id"] for p in gql(url, token, LIST_PAGES_QUERY)["pages"]["list"]}
     else:
-        existing = set()
+        existing = {}
 
     md_files = sorted(pages_dir.rglob("*.md"))
     print(f"    {len(md_files)} Markdown files found")
@@ -244,17 +260,20 @@ def main():
         title, tags, body = parse_frontmatter(text)
         path = normalize_path(title)   # consistent with how convert.sh named the file
 
-        if path in existing:
+        page_exists = path in existing
+
+        if page_exists and not args.update:
             page_skip += 1
             continue
 
         if args.dry_run:
-            print(f"    [dry] would create /{path} — \"{title}\" tags={tags}")
+            action = "update" if page_exists else "create"
+            print(f"    [dry] would {action} /{path} — \"{title}\" tags={tags}")
             page_ok += 1
             continue
 
         try:
-            data = gql(url, token, CREATE_PAGE_MUTATION, {
+            common = {
                 "content": body,
                 "description": "",
                 "editor": "markdown",
@@ -264,8 +283,15 @@ def main():
                 "path": path,
                 "tags": tags,
                 "title": title,
-            })
-            result = data["pages"]["create"]["responseResult"]
+            }
+            if page_exists:
+                page_id = existing[path]
+                data = gql(url, token, UPDATE_PAGE_MUTATION, {"id": page_id, **common})
+                result = data["pages"]["update"]["responseResult"]
+            else:
+                data = gql(url, token, CREATE_PAGE_MUTATION, common)
+                result = data["pages"]["create"]["responseResult"]
+
             if result["succeeded"]:
                 page_ok += 1
             else:
