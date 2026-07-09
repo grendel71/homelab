@@ -174,9 +174,9 @@ def main():
     page_ok = page_skip = page_fail = 0
     for md in md_files:
         rel = md.relative_to(pages_dir)
-        path = str(rel.with_suffix(""))   # e.g. "my-great-page"
         text = md.read_text()
         title, tags, body = parse_frontmatter(text)
+        path = normalize_path(title)   # consistent with how convert.sh named the file
 
         if path in existing:
             page_skip += 1
