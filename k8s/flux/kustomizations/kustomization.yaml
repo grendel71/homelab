@@ -34,3 +34,4 @@ resources:
   - ingress.yaml
   - infra-secrets.yaml
   - velero.yaml
+  - torrent.yaml
