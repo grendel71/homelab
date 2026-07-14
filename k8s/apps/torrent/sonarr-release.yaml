@@ -1,0 +1,33 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: sonarr
+  namespace: torrent
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: sonarr
+      sourceRef:
+        kind: OCIRepository
+        name: sonarr
+        namespace: torrent
+  values:
+    ingress:
+      enabled: false
+    persistence:
+      config:
+        enabled: true
+        size: 5Gi
+        storageClass: replicated-x3-block-store
+      media:
+        enabled: true
+        existingClaim: torrent-nfs-pvc
+        subPath: qb/downloads
+        mountPath: /downloads
+    service:
+      main:
+        ports:
+          http:
+            port: 8989
