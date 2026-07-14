@@ -44,6 +44,9 @@ spec:
               value: "1000"
           volumeMounts:
             - name: torrent-data
+              mountPath: /config
+              subPath: config
+            - name: torrent-data
               mountPath: /downloads
               subPath: downloads
       volumes:
