@@ -16,3 +16,7 @@ resources:
   - radarr-deployment.yaml
   - radarr-service.yaml
   - radarr-httproute.yaml
+  - prowlarr-config.yaml
+  - prowlarr-deployment.yaml
+  - prowlarr-service.yaml
+  - prowlarr-httproute.yaml
