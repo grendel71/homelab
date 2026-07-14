@@ -8,9 +8,11 @@ resources:
   - deployment.yaml
   - service.yaml
   - httproute.yaml
-  - sonarr-source.yaml
-  - sonarr-release.yaml
+  - sonarr-config.yaml
+  - sonarr-deployment.yaml
+  - sonarr-service.yaml
   - sonarr-httproute.yaml
-  - radarr-source.yaml
-  - radarr-release.yaml
+  - radarr-config.yaml
+  - radarr-deployment.yaml
+  - radarr-service.yaml
   - radarr-httproute.yaml
