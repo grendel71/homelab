@@ -4,6 +4,7 @@ namespace: torrent
 metadata:
   name: torrent
 resources:
+  - torrent-config.yaml
   - deployment.yaml
   - service.yaml
   - httproute.yaml
