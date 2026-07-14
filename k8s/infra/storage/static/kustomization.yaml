@@ -7,3 +7,4 @@ resources:
   - immich-media.yaml
   - immich-ml.yaml
   - lazywarden-backup-nfs.yaml
+  - torrent-nfs.yaml

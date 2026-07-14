@@ -30,26 +30,23 @@ spec:
           envFrom:
             - secretRef:
                 name: airvpn-secret
-        - name: curlpodtest
-          image: curlimages/curl
-          command: ["/bin/sh", "-c"]
-          args:
-            - &check-ip |
-              IP=$(curl -s checkip.amazonaws.com)
-              EXPECTED_IP="YOUR_IP_ADDRESS"
-              if [ "$IP" != "$EXPECTED_IP" ]; then
-                echo "IP is different from $EXPECTED_IP. Current IP is $IP."
-              else
-                echo "IP is $EXPECTED_IP. Exiting..."
-                exit 1
-              fi
       containers:
-        # Run whatever you want to ensure is going out the tunnel here
-        - name: curlpod
-          image: curlimages/curl
-          args:
-            - /bin/sh
-            - -c
-            - while true; do curl checkip.amazonaws.com; sleep 15;
-              done
+        - name: qbittorrent
+          image: linuxserver/qbittorrent:latest
           imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: webui
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+          volumeMounts:
+            - name: torrent-data
+              mountPath: /downloads
+              subPath: downloads
+      volumes:
+        - name: torrent-data
+          persistentVolumeClaim:
+            claimName: torrent-nfs-pvc

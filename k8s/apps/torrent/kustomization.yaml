@@ -5,3 +5,5 @@ metadata:
   name: torrent
 resources:
   - deployment.yaml
+  - service.yaml
+  - httproute.yaml
