@@ -10,7 +10,7 @@ spec:
       namespace: envoy-gateway-system
       sectionName: websecure
   hostnames:
-    - qbittorrent.envoy.grendel71.net
+    - qb.envoy.grendel71.net
   rules:
     - matches:
         - path:
