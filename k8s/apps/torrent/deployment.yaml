@@ -45,10 +45,10 @@ spec:
           volumeMounts:
             - name: torrent-data
               mountPath: /config
-              subPath: config
+              subPath: qb/config
             - name: torrent-data
               mountPath: /downloads
-              subPath: downloads
+              subPath: qb/downloads
       volumes:
         - name: torrent-data
           persistentVolumeClaim:
