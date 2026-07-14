@@ -1,11 +1,10 @@
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
-kind: OCIRepository
+kind: HelmRepository
 metadata:
   name: radarr
   namespace: torrent
 spec:
+  type: oci
   interval: 1h
-  url: oci://ghcr.io/bjw-s-labs/charts/radarr
-  ref:
-    semver: ">=1.0.0"
+  url: oci://ghcr.io/bjw-s-labs/charts

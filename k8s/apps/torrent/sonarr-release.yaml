@@ -10,7 +10,7 @@ spec:
     spec:
       chart: sonarr
       sourceRef:
-        kind: OCIRepository
+        kind: HelmRepository
         name: sonarr
         namespace: torrent
   values:

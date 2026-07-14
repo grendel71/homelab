@@ -10,7 +10,7 @@ spec:
     spec:
       chart: radarr
       sourceRef:
-        kind: OCIRepository
+        kind: HelmRepository
         name: radarr
         namespace: torrent
   values:
