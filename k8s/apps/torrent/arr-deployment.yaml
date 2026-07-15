@@ -2,19 +2,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: arr-stack
+  name: sonarr
   namespace: torrent
   labels:
-    app: arr-stack
+    app: sonarr
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: arr-stack
+      app: sonarr
   template:
     metadata:
       labels:
-        app: arr-stack
+        app: sonarr
     spec:
       containers:
         - name: sonarr
@@ -22,7 +22,7 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8989
-              name: sonarr
+              name: http
           env:
             - name: PUID
               value: "1000"
@@ -31,16 +31,41 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /config
-              subPath: sonarr
             - name: downloads
               mountPath: /downloads
               subPath: qb/downloads
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: sonarr-config-pvc
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: torrent-nfs-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: radarr
+  namespace: torrent
+  labels:
+    app: radarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: radarr
+  template:
+    metadata:
+      labels:
+        app: radarr
+    spec:
+      containers:
         - name: radarr
           image: linuxserver/radarr:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 7878
-              name: radarr
+              name: http
           env:
             - name: PUID
               value: "1000"
@@ -49,16 +74,41 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /config
-              subPath: radarr
             - name: downloads
               mountPath: /downloads
               subPath: qb/downloads
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: radarr-config-pvc
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: torrent-nfs-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prowlarr
+  namespace: torrent
+  labels:
+    app: prowlarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prowlarr
+  template:
+    metadata:
+      labels:
+        app: prowlarr
+    spec:
+      containers:
         - name: prowlarr
           image: linuxserver/prowlarr:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 9696
-              name: prowlarr
+              name: http
           env:
             - name: PUID
               value: "1000"
@@ -67,11 +117,7 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /config
-              subPath: prowlarr
       volumes:
         - name: config
           persistentVolumeClaim:
-            claimName: arr-config-pvc
-        - name: downloads
-          persistentVolumeClaim:
-            claimName: torrent-nfs-pvc
+            claimName: prowlarr-config-pvc
