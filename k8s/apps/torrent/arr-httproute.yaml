@@ -1,0 +1,63 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: sonarr-internal
+  namespace: torrent
+spec:
+  parentRefs:
+    - name: envoy-internal
+      namespace: envoy-gateway-system
+      sectionName: websecure
+  hostnames:
+    - sonarr.envoy.grendel71.net
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: arr-stack
+          port: 8989
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: radarr-internal
+  namespace: torrent
+spec:
+  parentRefs:
+    - name: envoy-internal
+      namespace: envoy-gateway-system
+      sectionName: websecure
+  hostnames:
+    - radarr.envoy.grendel71.net
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: arr-stack
+          port: 7878
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: prowlarr-internal
+  namespace: torrent
+spec:
+  parentRefs:
+    - name: envoy-internal
+      namespace: envoy-gateway-system
+      sectionName: websecure
+  hostnames:
+    - prowlarr.envoy.grendel71.net
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: arr-stack
+          port: 9696
