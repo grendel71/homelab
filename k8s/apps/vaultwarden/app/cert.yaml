@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: vaultwarden-tls
+  namespace: vaultwarden # Specify the namespace where the secret will be created
+spec:
+  secretName: vaultwarden-tls # The name of the Kubernetes Secret to store the certs in
+  issuerRef:
+    name: letsencrypt-production # Name of your Issuer or ClusterIssuer
+    kind: ClusterIssuer # Use 'Issuer' if it is namespace-scoped
+  dnsNames:
+    - "v.k8s.local.grendel71.net" # Replace with your domain name

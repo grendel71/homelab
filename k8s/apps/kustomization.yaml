@@ -8,3 +8,4 @@ resources:
   - pappwiki/ks.yaml
   - torrent/ks.yaml
   - nextcloud/ks.yaml
+  - vaultwarden/ks.yaml

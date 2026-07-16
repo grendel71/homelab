@@ -1,0 +1,43 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: vaultwarden
+  namespace: vaultwarden
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: vaultwarden
+      version: "0.34.6"
+      sourceRef:
+        kind: HelmRepository
+        name: vaultwarden
+        namespace: vaultwarden
+      interval: 12h
+  values:
+    domain: "https://v.k8s.local.grendel71.net"
+
+    ingress:
+      enabled: true
+      hostname: v.k8s.local.grendel71.net
+      class: "traefik-internal"
+      tlsSecret: vaultwarden-tls
+      additionalAnnotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        cert-manager.io/cluster-issuer: "letsencrypt-production"
+
+
+    image:
+      pullSecrets:
+      - name: myRegKey
+    
+    storage:
+      existingVolumeClaim:
+        claimName: "vaultwarden-data-pvc"
+        dataPath: "/data"
+        attachmentsPath: /data/attachments
+  valuesFrom:
+    - kind: Secret
+      name: vaultwarden-secret-values
+    
+    
