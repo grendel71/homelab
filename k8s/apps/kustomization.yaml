@@ -7,3 +7,4 @@ resources:
   - website/ks.yaml
   - pappwiki/ks.yaml
   - torrent/ks.yaml
+  - nextcloud/ks.yaml
