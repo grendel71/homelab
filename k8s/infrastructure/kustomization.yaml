@@ -4,3 +4,24 @@ kind: Kustomization
 resources:
   - sources/ks.yaml
   - namespaces/ks.yaml
+  - cert-manager/ks.yaml
+  - cert-manager-issuers/ks.yaml
+  - cnpg/ks.yaml
+  - ceph-cluster/ks.yaml
+  - object-store/ks.yaml
+  - storage/ks.yaml
+  - metallb/ks.yaml
+  - metallb-config/ks.yaml
+  - kube-vip/ks.yaml
+  - envoy-gateway/ks.yaml
+  - envoy-gateway-config/ks.yaml
+  - traefik-internal/ks.yaml
+  - external-dns-cloudflare/ks.yaml
+  - cloudflared/ks.yaml
+  - ingress/ks.yaml
+  - arc/ks.yaml
+  - nvidia-operator/ks.yaml
+  - velero/ks.yaml
+  - crds/ks.yaml
+  - infra-secrets/ks.yaml
+  - infra-releases/ks.yaml

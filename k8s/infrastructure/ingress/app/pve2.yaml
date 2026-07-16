@@ -1,0 +1,58 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pve2-cert
+  namespace: kube-system
+spec:
+  secretName: pve2-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  dnsNames:
+    - "pve2.k8s.local.grendel71.net"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pve2
+  namespace: kube-system
+spec:
+  ports:
+    - port: 8006
+      targetPort: 8006
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: pve2
+  namespace: kube-system
+subsets:
+  - addresses:
+      - ip: 192.168.1.167
+    ports:
+      - port: 8006
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: proxmox-ve2
+  namespace: kube-system
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-production"
+spec:
+  entryPoints:
+    - websecure
+    - web
+  routes:
+    - match: Host(`pve2.k8s.local.grendel71.net`)
+      kind: Rule
+      middlewares:
+        - name: redirect-to-https
+      services:
+        - name: pve2
+          namespace: kube-system
+          port: 8006
+          scheme: https
+          serversTransport: skipverify
+  tls:
+    secretName: pve2-tls

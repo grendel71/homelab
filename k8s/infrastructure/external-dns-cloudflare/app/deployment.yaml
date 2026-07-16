@@ -1,0 +1,56 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns-cloudflare
+  namespace: external-dns
+  labels:
+    app.kubernetes.io/name: external-dns-cloudflare
+    app.kubernetes.io/version: "0.15.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: external-dns-cloudflare
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: external-dns-cloudflare
+    spec:
+      serviceAccountName: external-dns-cloudflare
+      containers:
+        - name: external-dns
+          image: registry.k8s.io/external-dns/external-dns:v0.15.0
+          args:
+            - --source=ingress
+            - --source=gateway-httproute
+            - --source=gateway-grpcroute
+            - --source=gateway-tcproute
+            - --source=gateway-udproute
+            - --provider=cloudflare
+            - --cloudflare-proxied  # Enable Cloudflare proxy (orange cloud)
+            - --registry=txt
+            - --txt-owner-id=external-dns-cloudflare
+            - --txt-prefix=_externaldns.
+            # Manage grendel71.net zone, but exclude internal subdomain
+            - --domain-filter=grendel71.net
+            - --exclude-domains=k8s.local.grendel71.net
+            # Point all records to Cloudflare Tunnel (creates CNAME records)
+            - --default-targets=f53f1d5a-e787-4147-ab1c-ed9002200cdf.cfargotunnel.com
+            - --log-level=debug
+            - --interval=1m
+          env:
+            - name: CF_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflare-api-token
+                  key: CF_API_TOKEN
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

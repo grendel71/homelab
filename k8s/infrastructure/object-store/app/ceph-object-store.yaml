@@ -1,0 +1,21 @@
+---
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStore
+metadata:
+  name: ceph-objectstore
+  namespace: rook-ceph
+spec:
+  metadataPool:
+    failureDomain: host
+    replicated:
+      size: 2
+      requireSafeReplicaSize: false
+  dataPool:
+    failureDomain: host
+    replicated:
+      size: 2
+      requireSafeReplicaSize: false
+  preservePoolsOnDelete: false
+  gateway:
+    port: 80
+    instances: 2

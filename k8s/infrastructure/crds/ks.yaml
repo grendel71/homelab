@@ -1,0 +1,18 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: crds
+  namespace: flux-system
+spec:
+  interval: 5m0s
+  path: ./k8s/infrastructure/crds/app
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  prune: true
+  retryInterval: 2m0s
+  dependsOn:
+    - name: sources
+  timeout: 3m0s
+  wait: true

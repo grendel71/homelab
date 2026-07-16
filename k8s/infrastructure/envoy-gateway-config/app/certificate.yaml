@@ -1,0 +1,19 @@
+---
+# Wildcard certificate for Envoy Gateway
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grendel71-net
+  namespace: envoy-gateway-system
+spec:
+  secretName: grendel71-net-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  commonName: "grendel71.net"
+  dnsNames:
+    - "grendel71.net"
+    - "*.grendel71.net"
+    - "*.k8s.grendel71.net"
+    - "*.k8s.local.grendel71.net"
+    - "*.envoy.grendel71.net"

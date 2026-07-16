@@ -1,0 +1,35 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: envoy-gateway
+  namespace: envoy-gateway-system
+spec:
+  chart:
+    spec:
+      chart: gateway-helm
+      version: "1.8.x"
+      sourceRef:
+        kind: HelmRepository
+        name: envoy-gateway
+        namespace: flux-system
+  interval: 15m
+  timeout: 5m
+  install:
+    crds: Create
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    config:
+      envoyGateway:
+        extensionApis:
+          enableBackend: true
+        gateway:
+          controllerName: gateway.envoyproxy.io/gatewayclass-controller
+        logging:
+          level:
+            default: info

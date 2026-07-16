@@ -1,0 +1,33 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: dns-httproute
+  namespace: kube-system
+spec:
+  parentRefs:
+    - name: envoy-internal
+      namespace: envoy-gateway-system
+      sectionName: websecure
+  hostnames:
+    - dns.envoy.grendel71.net
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: truenas-backend
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: dns-backend
+  namespace: kube-system
+spec:
+  endpoints:
+    - ip:
+        address: 192.168.1.1
+        port: 8080
