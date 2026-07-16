@@ -1,0 +1,49 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: radarr
+  namespace: torrent
+spec:
+  interval: 30m
+  chartRef:
+    kind: OCIRepository
+    name: app-template
+  values:
+    controllers:
+      radarr:
+        containers:
+          app:
+            image:
+              repository: linuxserver/radarr
+              tag: latest
+            ports:
+              - name: http
+                containerPort: 7878
+            env:
+              PUID: "1000"
+              PGID: "1000"
+    persistence:
+      config:
+        existingClaim: radarr-config-pvc
+        globalMounts:
+          - path: /config
+      downloads:
+        existingClaim: torrent-nfs-pvc
+        globalMounts:
+          - path: /downloads
+            subPath: qb/downloads
+    service:
+      app:
+        controller: radarr
+        ports:
+          http:
+            port: 7878
+    route:
+      internal:
+        hostnames:
+          - radarr.envoy.grendel71.net
+        parentRefs:
+          - name: envoy-internal
+            namespace: envoy-gateway-system
+            sectionName: websecure
