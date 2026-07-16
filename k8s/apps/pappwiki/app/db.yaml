@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pappwiki-db
+  namespace: pappwiki
+spec:
+  instances: 1
+  bootstrap:
+    initdb:
+      database: pappwiki
+      owner: pappwiki
+      secret:
+        name: pappwiki-db-secret
+  storage:
+    size: 8Gi
+    storageClass: replicated-x3-block-store
