@@ -6,4 +6,5 @@ metadata:
   namespace: flux-system
 resources:
   - flux-system
-  - flux/kustomizations
+  - infrastructure
+  - apps
