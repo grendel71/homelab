@@ -1,0 +1,16 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+components:
+  - ../common/all-namespaces
+resources:
+  - website/ks.yaml
+  - pappwiki/ks.yaml
+  - torrent/ks.yaml
+  - nextcloud/ks.yaml
+  - vaultwarden/ks.yaml
+  - jellyfin/ks.yaml
+  - authentik/ks.yaml
+  - immich/ks.yaml
+  - open-webui/ks.yaml
+  - payments/ks.yaml

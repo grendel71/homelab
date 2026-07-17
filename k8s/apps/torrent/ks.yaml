@@ -1,0 +1,64 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: qbittorrent
+  namespace: flux-system
+spec:
+  targetNamespace: torrent
+  interval: 30m
+  path: ./k8s/apps/torrent/qbittorrent
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  components:
+    - ../../../common/all-namespaces
+  dependsOn:
+    - name: namespace
+    - name: infra-secrets
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: qbittorrent
+      namespace: torrent
+  timeout: 5m
+  wait: false
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: arr
+  namespace: flux-system
+spec:
+  targetNamespace: torrent
+  interval: 30m
+  path: ./k8s/apps/torrent/arr
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  components:
+    - ../../../common/all-namespaces
+  dependsOn:
+    - name: namespace
+    - name: qbittorrent
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: sonarr
+      namespace: torrent
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: radarr
+      namespace: torrent
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: prowlarr
+      namespace: torrent
+  timeout: 5m
+  wait: false

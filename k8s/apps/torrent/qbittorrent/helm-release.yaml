@@ -1,0 +1,61 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: qbittorrent
+  namespace: torrent
+spec:
+  interval: 30m
+  chartRef:
+    kind: OCIRepository
+    name: app-template
+  values:
+    controllers:
+      qbittorrent:
+        initContainers:
+          gluetun:
+            restartPolicy: Always
+            image:
+              repository: ghcr.io/qdm12/gluetun
+              tag: latest
+            securityContext:
+              capabilities:
+                add: ["NET_ADMIN"]
+            envFrom:
+              - secretRef:
+                  name: airvpn-secret
+        containers:
+          app:
+            image:
+              repository: linuxserver/qbittorrent
+              tag: latest
+            ports:
+              - name: webui
+                containerPort: 8080
+            env:
+              PUID: "1000"
+              PGID: "1000"
+    persistence:
+      config:
+        existingClaim: torrent-config-pvc
+        globalMounts:
+          - path: /config
+      downloads:
+        existingClaim: torrent-nfs-pvc
+        globalMounts:
+          - path: /downloads
+            subPath: qb/downloads
+    service:
+      app:
+        controller: qbittorrent
+        ports:
+          webui:
+            port: 8080
+    route:
+      internal:
+        hostnames:
+          - qb.envoy.grendel71.net
+        parentRefs:
+          - name: envoy-internal
+            namespace: envoy-gateway-system
+            sectionName: websecure
