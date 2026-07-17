@@ -1,0 +1,54 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tuwunel
+  namespace: apps
+spec:
+  interval: 30m
+  chartRef:
+    kind: OCIRepository
+    name: app-template
+  values:
+    controllers:
+      tuwunel:
+        strategy: Recreate
+        containers:
+          app:
+            image:
+              repository: jevolk/tuwunel
+              tag: latest
+            ports:
+              - name: http
+                containerPort: 8008
+            env:
+              TUWUNEL_ADDRESS: "0.0.0.0"
+              TUWUNEL_SERVER_NAME: "tw.envoy.grendel71.net"
+              TUWUNEL_ALLOW_REGISTRATION: "false"
+            resources:
+              requests:
+                memory: 512Mi
+                cpu: 250m
+              limits:
+                memory: 1Gi
+                cpu: "1"
+    persistence:
+      database:
+        existingClaim: tuwunel-data-pvc
+        globalMounts:
+          - path: /var/lib/tuwunel
+            subPath: tuwunel
+    service:
+      app:
+        controller: tuwunel
+        ports:
+          http:
+            port: 8008
+    route:
+      internal:
+        hostnames:
+          - tw.envoy.grendel71.net
+        parentRefs:
+          - name: envoy-internal
+            namespace: envoy-gateway-system
+            sectionName: websecure
