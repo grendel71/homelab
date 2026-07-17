@@ -21,10 +21,13 @@ spec:
             ports:
               - name: http
                 containerPort: 8008
+            envFrom:
+              - secretRef:
+                  name: tuwunel-registration-secret
             env:
               TUWUNEL_ADDRESS: "0.0.0.0"
               TUWUNEL_SERVER_NAME: "tw.envoy.grendel71.net"
-              TUWUNEL_ALLOW_REGISTRATION: "false"
+              TUWUNEL_ALLOW_REGISTRATION: "true"
             resources:
               requests:
                 memory: 512Mi
