@@ -13,3 +13,4 @@ resources:
   - authentik/ks.yaml
   - immich/ks.yaml
   - open-webui/ks.yaml
+  - payments/ks.yaml
