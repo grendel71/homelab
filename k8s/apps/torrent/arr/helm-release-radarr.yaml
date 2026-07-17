@@ -33,6 +33,11 @@ spec:
         globalMounts:
           - path: /downloads
             subPath: qb/downloads
+      media:
+        existingClaim: torrent-nfs-pvc
+        globalMounts:
+          - path: /nfs-media
+            subPath: poolshare1/media
     service:
       app:
         controller: radarr
