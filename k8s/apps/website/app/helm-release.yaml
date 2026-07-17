@@ -53,7 +53,7 @@ spec:
     persistence:
       caddyfile:
         type: configMap
-        name: website-caddyfile
+        identifier: caddyfile
         globalMounts:
           - path: /etc/caddy/Caddyfile
             subPath: Caddyfile
