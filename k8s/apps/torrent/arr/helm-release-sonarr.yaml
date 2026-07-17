@@ -36,7 +36,7 @@ spec:
       media:
         existingClaim: torrent-nfs-pvc
         globalMounts:
-          - path: /media
+          - path: /nfs-media
             subPath: poolshare1/media
     service:
       app:
