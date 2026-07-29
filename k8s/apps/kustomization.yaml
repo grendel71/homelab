@@ -6,6 +6,7 @@ resources:
   - pappwiki/ks.yaml
   - torrent/ks.yaml
   - tuwunel/ks.yaml
+  - mautrix-meta/ks.yaml
   - nextcloud/ks.yaml
   - vaultwarden/ks.yaml
   - jellyfin/ks.yaml

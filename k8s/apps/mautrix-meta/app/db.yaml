@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: mautrix-meta-db
+  namespace: apps
+spec:
+  instances: 1
+  bootstrap:
+    initdb:
+      database: mautrixmeta
+      owner: mautrixmeta
+      secret:
+        name: mautrix-meta-db-secret
+  storage:
+    size: 2Gi
+    storageClass: replicated-x3-block-store
