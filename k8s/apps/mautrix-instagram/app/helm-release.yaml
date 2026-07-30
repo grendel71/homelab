@@ -18,8 +18,11 @@ spec:
             image:
               repository: dock.mau.dev/mautrix/meta
               tag: ig-latest
+            # NB: the ig-* image tags still ship the Instagram binary at
+            # /usr/bin/mautrix-meta -- Dockerfile.ci hardcodes that
+            # destination path regardless of which binary was built in.
             command:
-              - /usr/bin/mautrix-instagram
+              - /usr/bin/mautrix-meta
             args:
               - -c
               - /data/config.yaml
