@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: mautrix-instagram-db
+  namespace: apps
+spec:
+  instances: 1
+  bootstrap:
+    initdb:
+      database: mautrixinstagram
+      owner: mautrixinstagram
+      secret:
+        name: mautrix-instagram-db-secret
+  storage:
+    size: 2Gi
+    storageClass: replicated-x3-block-store
