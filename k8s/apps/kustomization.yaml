@@ -8,6 +8,7 @@ resources:
   - tuwunel/ks.yaml
   - mautrix-meta/ks.yaml
   - mautrix-instagram/ks.yaml
+  - mautrix-whatsapp/ks.yaml
   - nextcloud/ks.yaml
   - vaultwarden/ks.yaml
   - jellyfin/ks.yaml
