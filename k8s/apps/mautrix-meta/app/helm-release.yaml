@@ -43,9 +43,12 @@ spec:
           config.yaml: |
             # Network-specific config options
             network:
-                # Which service is this bridge for? unset = allow users to pick
-                # Messenger or Instagram at login time.
-                mode:
+                # Which service is this bridge for? Instagram support was
+                # removed from mautrix-meta upstream (v26.07+) in favor of a
+                # separate mautrix-instagram bridge, and leaving this unset
+                # still offers a dead "instagram" login flow that errors
+                # with "Invalid login flow ID". Pin to messenger explicitly.
+                mode: messenger
                 allow_messenger_com_on_fb: false
                 allowed_modes: []
                 displayname_template: '{{`{{or .DisplayName .Username "Unknown user"}}`}}'
@@ -162,8 +165,8 @@ spec:
                 id: meta
                 bot:
                     username: metabot
-                    displayname: Meta Bridge Bot
-                    avatar: mxc://maunium.net/DxpVrwwzPUwaUSazpsjXgcKB
+                    displayname: Messenger Bridge Bot
+                    avatar: mxc://maunium.net/ygtkteZsXnGJLJHRchUwYWak
                 ephemeral_events: true
                 async_transactions: false
                 # Overridden at runtime via BRIDGE_APPSERVICE__AS_TOKEN / __HS_TOKEN env vars
