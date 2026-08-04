@@ -10,13 +10,14 @@ spec:
     kind: OCIRepository
     name: app-template
   values:
+    defaultPodOptions:
+      hostAliases:
+        - ip: "192.168.1.69"
+          hostnames:
+            - "v.envoy.grendel71.net"
     controllers:
       bw-portal:
         strategy: Recreate
-        hostAliases:
-          - ip: "192.168.1.69"
-            hostnames:
-              - "v.envoy.grendel71.net"
         containers:
           app:
             image:
