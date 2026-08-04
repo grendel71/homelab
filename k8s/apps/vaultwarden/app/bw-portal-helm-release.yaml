@@ -16,7 +16,7 @@ spec:
         containers:
           app:
             image:
-              repository: reaper0x1/bitwarden-portal
+              repository: ghcr.io/grendel71/bitwarden-portal
               tag: latest
             envFrom:
               - secretRef:
