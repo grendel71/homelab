@@ -10,3 +10,12 @@ spec:
   capabilities:
     user: "*"
     bucket: "*"
+---
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: obsidian-bucket
+  namespace: rook-ceph
+spec:
+  storageClassName: replicated-x3-block-store
+  generateBucketName: obsidian-bucket
