@@ -16,6 +16,7 @@ spec:
     - ../../../common/all-namespaces
   dependsOn:
     - name: namespace
+    - name: sources
   decryption:
     provider: sops
     secretRef:

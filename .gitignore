@@ -12,7 +12,7 @@ age.agekey
 workernvme.yaml
 talos-infra
 patches/
-
+.opencode
 # Terraform
 terraform/*.tfvars
 terraform/.terraform/
