@@ -20,3 +20,4 @@ resources:
   - arc.yaml
   - payments.yaml
   - torrent.yaml
+  - leaderboard.yaml

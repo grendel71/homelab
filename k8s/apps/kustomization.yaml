@@ -16,3 +16,4 @@ resources:
   - immich/ks.yaml
   - open-webui/ks.yaml
   - payments/ks.yaml
+  - leaderboard/ks.yaml
