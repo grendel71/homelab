@@ -22,17 +22,18 @@ spec:
               - name: http
                 containerPort: 8080
             env:
-              DB_USER:
+              - name: DB_USER
                 valueFrom:
                   secretKeyRef:
                     name: leaderboard-db-secret
                     key: username
-              DB_PASSWORD:
+              - name: DB_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: leaderboard-db-secret
                     key: password
-              DATABASE_URL: postgres://$(DB_USER):$(DB_PASSWORD)@leaderboard-db-rw:5432/leaderboard
+              - name: DATABASE_URL
+                value: postgres://$(DB_USER):$(DB_PASSWORD)@leaderboard-db-rw:5432/leaderboard
             resources:
               requests:
                 memory: 128Mi
