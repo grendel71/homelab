@@ -122,7 +122,7 @@ spec:
 
                 # Permissions for using the bridge.
                 permissions:
-                    "@blau:tw.envoy.grendel71.net": admin
+                    "@blau:tw.internal.grendel71.net": admin
 
             # Config for the bridge's database.
             database:
@@ -137,7 +137,7 @@ spec:
             # Homeserver details.
             homeserver:
                 address: http://tuwunel:8008
-                domain: tw.envoy.grendel71.net
+                domain: tw.internal.grendel71.net
                 software: standard
                 status_endpoint:
                 message_send_checkpoint_endpoint:

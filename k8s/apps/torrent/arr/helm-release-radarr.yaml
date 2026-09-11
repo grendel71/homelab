@@ -47,7 +47,7 @@ spec:
     route:
       internal:
         hostnames:
-          - radarr.envoy.grendel71.net
+          - radarr.internal.grendel71.net
         parentRefs:
           - name: envoy-internal
             namespace: envoy-gateway-system

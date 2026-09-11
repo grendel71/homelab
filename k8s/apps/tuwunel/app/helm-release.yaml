@@ -23,7 +23,7 @@ spec:
                 containerPort: 8008
             env:
               TUWUNEL_ADDRESS: "0.0.0.0"
-              TUWUNEL_SERVER_NAME: "tw.envoy.grendel71.net"
+              TUWUNEL_SERVER_NAME: "tw.internal.grendel71.net"
               TUWUNEL_ALLOW_REGISTRATION: "false"
             resources:
               requests:
@@ -47,7 +47,7 @@ spec:
     route:
       internal:
         hostnames:
-          - tw.envoy.grendel71.net
+          - tw.internal.grendel71.net
         parentRefs:
           - name: envoy-internal
             namespace: envoy-gateway-system

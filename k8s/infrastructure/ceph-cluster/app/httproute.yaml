@@ -10,7 +10,7 @@ spec:
       namespace: envoy-gateway-system
       sectionName: websecure
   hostnames:
-    - rook.envoy.grendel71.net
+    - rook.internal.grendel71.net
   rules:
     - matches:
         - path:

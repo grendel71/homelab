@@ -11,7 +11,7 @@ spec:
       namespace: envoy-gateway-system
       sectionName: websecure
   hostnames:
-    - v.envoy.grendel71.net
+    - v.internal.grendel71.net
   rules:
     - matches:
         - path:

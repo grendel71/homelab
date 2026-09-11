@@ -16,4 +16,4 @@ spec:
     - "*.grendel71.net"
     - "*.k8s.grendel71.net"
     - "*.k8s.local.grendel71.net"
-    - "*.envoy.grendel71.net"
+    - "*.internal.grendel71.net"

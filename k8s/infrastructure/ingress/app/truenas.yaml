@@ -10,7 +10,7 @@ spec:
       namespace: envoy-gateway-system
       sectionName: websecure
   hostnames:
-    - truenas.envoy.grendel71.net
+    - truenas.internal.grendel71.net
   rules:
     - matches:
         - path:

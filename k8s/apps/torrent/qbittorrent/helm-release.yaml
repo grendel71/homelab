@@ -54,7 +54,7 @@ spec:
     route:
       internal:
         hostnames:
-          - qb.envoy.grendel71.net
+          - qb.internal.grendel71.net
         parentRefs:
           - name: envoy-internal
             namespace: envoy-gateway-system

@@ -10,7 +10,7 @@ spec:
       namespace: envoy-gateway-system
       sectionName: websecure
   hostnames:
-    - immich.envoy.grendel71.net
+    - immich.internal.grendel71.net
   rules:
     - matches:
         - path:

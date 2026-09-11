@@ -52,7 +52,7 @@ spec:
     route:
       internal:
         hostnames:
-          - papp.envoy.grendel71.net
+          - papp.internal.grendel71.net
         parentRefs:
           - name: envoy-internal
             namespace: envoy-gateway-system

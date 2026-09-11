@@ -10,7 +10,7 @@ spec:
       namespace: envoy-gateway-system
       sectionName: websecure
   hostnames:
-    - s3.envoy.grendel71.net
+    - s3.internal.grendel71.net
   rules:
     - matches:
         - path:

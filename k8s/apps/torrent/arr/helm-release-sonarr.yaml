@@ -47,7 +47,7 @@ spec:
     route:
       internal:
         hostnames:
-          - sonarr.envoy.grendel71.net
+          - sonarr.internal.grendel71.net
         parentRefs:
           - name: envoy-internal
             namespace: envoy-gateway-system

@@ -10,7 +10,7 @@ spec:
       namespace: envoy-gateway-system
       sectionName: websecure
   hostnames:
-    - pve.envoy.grendel71.net
+    - pve.internal.grendel71.net
   rules:
     - matches:
         - path:

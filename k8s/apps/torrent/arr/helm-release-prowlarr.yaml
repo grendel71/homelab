@@ -37,7 +37,7 @@ spec:
     route:
       internal:
         hostnames:
-          - prowlarr.envoy.grendel71.net
+          - prowlarr.internal.grendel71.net
         parentRefs:
           - name: envoy-internal
             namespace: envoy-gateway-system
