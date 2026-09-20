@@ -1,0 +1,9 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: kubevirt
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: https://general-intelligence-systems.github.io/kubevirt-helm

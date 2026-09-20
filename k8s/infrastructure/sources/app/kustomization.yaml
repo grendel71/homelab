@@ -18,3 +18,5 @@ resources:
   - traefik.yaml
   - velero.yaml
   - vaultwarden.yaml
+  - kubevirt.yaml
+
