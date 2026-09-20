@@ -25,3 +25,4 @@ resources:
   - crds/ks.yaml
   - infra-secrets/ks.yaml
   - infra-releases/ks.yaml
+  - kubevirt/ks.yaml
