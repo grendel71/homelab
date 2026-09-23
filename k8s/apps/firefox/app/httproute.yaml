@@ -1,0 +1,37 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: firefox 
+  namespace: apps 
+  annotations:
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+spec:
+  parentRefs:
+    - name: envoy-internal
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - firefox.internal.grendel71.net
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: firefox-backend
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: firefox-backend 
+  namespace: apps 
+spec:
+  endpoints:
+    - fqdn:
+        hostname: firefox.apps.svc.cluster.local
+        port: 5000
+  tls:
+    insecureSkipVerify: true

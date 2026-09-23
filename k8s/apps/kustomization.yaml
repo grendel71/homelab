@@ -17,3 +17,4 @@ resources:
   - open-webui/ks.yaml
   - payments/ks.yaml
   - leaderboard/ks.yaml
+  - firefox/ks.yaml
