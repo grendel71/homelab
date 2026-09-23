@@ -20,7 +20,7 @@ spec:
               tag: latest
             ports:
               - name: https
-                containerPort: 5000
+                containerPort: 3000
     persistence:
       config:
         type: persistentVolumeClaim
@@ -33,4 +33,4 @@ spec:
         controller: firefox
         ports:
           https:
-            port: 5000
+            port: 3000

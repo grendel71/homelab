@@ -32,6 +32,4 @@ spec:
   endpoints:
     - fqdn:
         hostname: firefox.apps.svc.cluster.local
-        port: 5000
-  tls:
-    insecureSkipVerify: true
+        port: 3000
