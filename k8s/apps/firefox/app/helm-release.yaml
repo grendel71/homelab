@@ -16,7 +16,7 @@ spec:
         containers:
           app:
             image:
-              repository: lscr.io/linuxserver/firefox:latest
+              repository: lscr.io/linuxserver/firefox
               tag: latest
             ports:
               - name: https
