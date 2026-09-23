@@ -19,20 +19,5 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - group: gateway.envoyproxy.io
-          kind: Backend
-          name: firefox-backend
----
-apiVersion: gateway.envoyproxy.io/v1alpha1
-kind: Backend
-metadata:
-  name: firefox-backend 
-  namespace: apps 
-spec:
-  endpoints:
-    - fqdn:
-        hostname: firefox.apps.svc.cluster.local
-        port: 3001
-  # The LinuxServer Firefox container serves its web UI over HTTPS.
-  tls:
-    insecureSkipVerify: true
+        - name: firefox
+          port: 3000
