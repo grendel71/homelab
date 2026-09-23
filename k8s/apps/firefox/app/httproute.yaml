@@ -10,7 +10,7 @@ spec:
   parentRefs:
     - name: envoy-internal
       namespace: envoy-gateway-system
-      sectionName: https
+       sectionName: websecure
   hostnames:
     - firefox.internal.grendel71.net
   rules:
