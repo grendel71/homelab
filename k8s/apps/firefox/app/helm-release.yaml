@@ -19,8 +19,10 @@ spec:
               repository: lscr.io/linuxserver/firefox
               tag: latest
             ports:
-              - name: https
+              - name: http
                 containerPort: 3000
+              - name: https
+                containerPort: 3001
     persistence:
       config:
         type: persistentVolumeClaim
@@ -32,5 +34,7 @@ spec:
       app:
         controller: firefox
         ports:
-          https:
+          http:
             port: 3000
+          https:
+            port: 3001

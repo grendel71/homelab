@@ -32,4 +32,7 @@ spec:
   endpoints:
     - fqdn:
         hostname: firefox.apps.svc.cluster.local
-        port: 3000
+        port: 3001
+  # The LinuxServer Firefox container serves its web UI over HTTPS.
+  tls:
+    insecureSkipVerify: true
