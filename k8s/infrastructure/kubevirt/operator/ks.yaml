@@ -10,7 +10,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: ./k8s/infrastructure/kubevirt/app
+  path: ./k8s/infrastructure/kubevirt/operator/app
   prune: true
   wait: true
   timeout: 5m
