@@ -1,17 +1,20 @@
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
 metadata:
-  name: ubuntu-vm-data
+  name: ubuntu-vm-rootdisk
   namespace: kubevirt
 spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: replicated-x3-block-store
-  volumeMode: Filesystem
-  resources:
-    requests:
-      storage: 10Gi
+  source:
+    registry:
+      url: docker://quay.io/containerdisks/ubuntu:24.04
+  storage:
+    storageClassName: replicated-x3-block-store
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 20Gi
 ---
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
@@ -35,19 +38,13 @@ spec:
             - name: rootdisk
               disk:
                 bus: virtio
-            - name: datadisk
-              disk:
-                bus: virtio
             - name: cloudinitdisk
               disk:
                 bus: virtio
       volumes:
         - name: rootdisk
-          containerDisk:
-            image: quay.io/containerdisks/ubuntu:24.04
-        - name: datadisk
-          persistentVolumeClaim:
-            claimName: ubuntu-vm-data
+          dataVolume:
+            name: ubuntu-vm-rootdisk
         - name: cloudinitdisk
           cloudInitNoCloud:
             userData: |
