@@ -26,3 +26,4 @@ resources:
   - infra-secrets/ks.yaml
   - infra-releases/ks.yaml
   - kubevirt/operator/ks.yaml
+  - kubevirt/vms/ks.yaml
