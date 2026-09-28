@@ -59,3 +59,18 @@ spec:
                   sudo: ALL=(ALL) NOPASSWD:ALL
                   ssh_authorized_keys:
                     - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFnx/ZGyG6ED/Pe1SUWEDeGhuAl5PV6thdet6Pu9p55z blau@blau-pc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ubuntu-vm-ssh
+  namespace: kubevirt
+spec:
+  type: LoadBalancer
+  selector:
+    kubevirt.io/domain: ubuntu-vm
+  ports:
+    - name: ssh
+      port: 22
+      targetPort: 22
+      protocol: TCP
