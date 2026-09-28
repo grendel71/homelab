@@ -1,3 +1,18 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ubuntu-vm-data
+  namespace: kubevirt
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: replicated-x3-block-store
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 10Gi
+---
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
@@ -5,26 +20,42 @@ metadata:
   namespace: kubevirt
 spec:
   runStrategy: Always
-
   template:
     metadata:
       labels:
         kubevirt.io/domain: ubuntu-vm
-
     spec:
       domain:
         resources:
           requests:
             memory: 2Gi
             cpu: "2"
-
         devices:
           disks:
             - name: rootdisk
               disk:
                 bus: virtio
-
+            - name: datadisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
       volumes:
         - name: rootdisk
           containerDisk:
             image: quay.io/containerdisks/ubuntu:24.04
+        - name: datadisk
+          persistentVolumeClaim:
+            claimName: ubuntu-vm-data
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              users:
+                - name: blau
+                  groups: sudo
+                  shell: /bin/bash
+                  sudo: ALL=(ALL) NOPASSWD:ALL
+                  ssh_authorized_keys:
+                    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFnx/ZGyG6ED/Pe1SUWEDeGhuAl5PV6thdet6Pu9p55z blau@blau-pc
