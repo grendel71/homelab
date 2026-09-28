@@ -35,6 +35,10 @@ spec:
             memory: 8Gi
             cpu: "4"
         devices:
+          inputs:
+            - type: tablet
+              bus: usb
+              name: tablet-usb
           disks:
             - name: rootdisk
               disk:
