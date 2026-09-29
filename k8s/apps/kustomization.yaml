@@ -18,3 +18,5 @@ resources:
   - payments/ks.yaml
   - leaderboard/ks.yaml
   - firefox/ks.yaml
+  - searxng/ks.yaml
+
