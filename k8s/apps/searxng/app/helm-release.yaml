@@ -93,7 +93,7 @@ spec:
           enable_metrics: true
           open_metrics: ""
         server:
-          base_url: https://searxng.internal.grendel71.net/
+          base_url: https://xng.internal.grendel71.net/
           limiter: false
           public_instance: false
           image_proxy: true
