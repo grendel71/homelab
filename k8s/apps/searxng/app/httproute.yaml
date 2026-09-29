@@ -19,5 +19,5 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: authentik-server
-          port: 80
+        - name: searxng 
+          port: 8080
