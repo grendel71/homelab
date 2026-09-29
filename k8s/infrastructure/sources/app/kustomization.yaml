@@ -19,4 +19,5 @@ resources:
   - velero.yaml
   - vaultwarden.yaml
   - kubevirt.yaml
+  - searxng.yaml
 

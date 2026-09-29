@@ -1,0 +1,201 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: searxng
+  namespace: apps
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: searxng
+      #version: "0.34.4"
+      sourceRef:
+        kind: HelmRepository
+        name: searxng
+        namespace: apps
+      interval: 12h
+  values: 
+    nameOverride: ""
+    fullnameOverride: ""
+    commonLabels: {}
+    image:
+      repository: searxng/searxng
+      tag: 2026.8.12-cdfdaa5a8
+      pullPolicy: IfNotPresent
+      pullSecrets: []
+    replicaCount: 1
+    revisionHistoryLimit: 3
+    deploymentAnnotations: {}
+    podAnnotations: {}
+    podLabels: {}
+    serviceAccount:
+      create: true
+      annotations: {}
+      name: ""
+    service:
+      type: ClusterIP
+      port: 8080
+      annotations: {}
+      ipFamilies: []
+      ipFamilyPolicy: ""
+      sessionAffinity: None
+    ingress:
+      enabled: false
+      className: ""
+      annotations: {}
+      hosts:
+        - host: searxng.local
+          paths:
+            - path: /
+              pathType: Prefix
+      tls: []
+    gateway:
+      enabled: false
+      labels: {}
+      annotations: {}
+      parentRefs: []
+      hostnames: []
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters: []
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    topologySpreadConstraints: []
+    priorityClassName: ""
+    terminationGracePeriodSeconds: 30
+    hostAliases: []
+    env:
+      forceOwnership: true
+      values: {}
+      secretValues: {}
+      existingSecrets: []
+      existingConfigMaps: []
+    secret:
+      create: true
+      existingSecret: ""
+      existingSecretKey: SEARXNG_SECRET
+      value: ""
+    config:
+      useDefaultSettings: true
+      settings:
+        general:
+          debug: false
+          instance_name: SearXNG
+          enable_metrics: true
+          open_metrics: ""
+        server:
+          base_url: https://searxng.internal.grendel71.net/
+          limiter: false
+          public_instance: false
+          image_proxy: true
+          method: GET
+        engines:
+          - name: wikidata
+            disabled: true
+          - name: ahmia
+            disabled: true      
+      files: {}
+      secretFiles: {}
+    persistence:
+      config:
+        enabled: true
+        existingClaim: ""
+        accessMode: ReadWriteOnce
+        size: 1Gi
+        storageClass: "replicated-x3-block-store"
+        annotations: {}
+      cache:
+        enabled: true
+        existingClaim: ""
+        accessMode: ReadWriteOnce
+        size: 2Gi
+        storageClass: "replicated-x3-block-store"
+        annotations: {}
+    valkey:
+      enabled: true
+      externalUrl: ""
+      externalUrlSecret:
+        name: ""
+        key: SEARXNG_VALKEY_URL
+      image:
+        repository: docker.io/valkey/valkey
+        tag: 9.1.1-trixie
+        pullPolicy: IfNotPresent
+      command:
+        - valkey-server
+        - --save
+        - "30"
+        - "1"
+        - --loglevel
+        - warning
+      service:
+        port: 6379
+        annotations: {}
+      persistence:
+        enabled: true
+        existingClaim: ""
+        accessMode: ReadWriteOnce
+        size: 1Gi
+        storageClass: ""
+        annotations: {}
+      auth:
+        enabled: false
+        password: ""
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
+      podAnnotations: {}
+      podLabels: {}
+      nodeSelector: {}
+      tolerations: []
+      affinity: {}
+    probes:
+      startup:
+        enabled: true
+        tcpSocket:
+          port: http
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        failureThreshold: 30
+        timeoutSeconds: 1
+      readiness:
+        enabled: true
+        tcpSocket:
+          port: http
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        failureThreshold: 6
+        timeoutSeconds: 1
+      liveness:
+        enabled: true
+        tcpSocket:
+          port: http
+        initialDelaySeconds: 30
+        periodSeconds: 20
+        failureThreshold: 6
+        timeoutSeconds: 1
+    extraVolumes: []
+    extraVolumeMounts: []
+    caCertificates:
+      existingConfigMap: ""
+      existingSecret: ""
+      files: {}
+      mountPath: /usr/local/share/ca-certificates/chart-extra
+    testConnection:
+      enabled: true
+      image:
+        repository: busybox
+        tag: "1.36"
+        pullPolicy: IfNotPresent
