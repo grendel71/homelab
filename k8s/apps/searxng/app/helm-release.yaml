@@ -12,7 +12,7 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: searxng
-        namespace: apps
+        namespace: flux-system
       interval: 12h
   values: 
     nameOverride: ""
