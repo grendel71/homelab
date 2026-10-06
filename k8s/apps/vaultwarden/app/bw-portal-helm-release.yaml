@@ -12,9 +12,9 @@ spec:
   values:
     defaultPodOptions:
       hostAliases:
-        - ip: "192.168.1.69"
+        - ip: "192.168.1.71"
           hostnames:
-            - "v.internal.grendel71.net"
+            - "v.x.nx8192.win"
     controllers:
       bw-portal:
         strategy: Recreate

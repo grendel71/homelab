@@ -7,11 +7,11 @@ metadata:
   namespace: vaultwarden
 spec:
   parentRefs:
-    - name: envoy-internal
+    - name: envoy-nx
       namespace: envoy-gateway-system
       sectionName: websecure
   hostnames:
-    - v.internal.grendel71.net
+    - v.x.nx8192.win
   rules:
     - matches:
         - path:

@@ -15,7 +15,7 @@ spec:
         namespace: vaultwarden
       interval: 12h
   values:
-    domain: "https://v.k8s.local.grendel71.net"
+    domain: "https://v.x.nx8192.win"
 
     ingress:
       enabled: true
