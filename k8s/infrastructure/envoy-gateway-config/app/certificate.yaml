@@ -17,3 +17,21 @@ spec:
     - "*.k8s.grendel71.net"
     - "*.k8s.local.grendel71.net"
     - "*.internal.grendel71.net"
+---
+# Wildcard certificate for Envoy Gateway
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nx-net
+  namespace: envoy-gateway-system
+spec:
+  secretName: nx-net-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  commonName: "nx8192.win"
+  dnsNames:
+    - "nx8192.win"
+    - "*.nx8192.win"
+    - "*.x.nx8192.win"
+    - "*.ex.nx8192.win"
