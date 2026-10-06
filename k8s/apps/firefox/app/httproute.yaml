@@ -8,11 +8,11 @@ metadata:
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
 spec:
   parentRefs:
-    - name: envoy-internal
+    - name: envoy-nx
       namespace: envoy-gateway-system
       sectionName: websecure
   hostnames:
-    - firefox.internal.grendel71.net
+    - ff.x.nx8192.win
   rules:
     - matches:
         - path:
