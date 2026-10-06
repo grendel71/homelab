@@ -29,6 +29,14 @@ data:
         service: https://192.168.1.67:443
         originRequest:
           noTLSVerify: true
-
+      - hostname: "*.ex.nx8192.win"
+        service: https://192.168.1.67:443
+        originRequest:
+          noTLSVerify: true
+      
+      - hostname: "nx8192.win"
+        service: https://192.168.1.67:443
+        originRequest:
+          noTLSVerify: true
       # Catch-all (required)
       - service: http_status:404
