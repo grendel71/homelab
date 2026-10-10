@@ -29,13 +29,12 @@ metadata:
 spec:
   runStrategy: Always
   template:
-    spec:
-      nodeSelector:
-        baremetal: "true"
     metadata:
       labels:
         kubevirt.io/domain: ubuntu-vm
     spec:
+      nodeSelector:
+        baremetal: "true"
       domain:
         resources:
           requests:
