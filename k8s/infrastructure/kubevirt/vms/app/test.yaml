@@ -8,11 +8,15 @@ spec:
   source:
     registry:
       url: docker://quay.io/containerdisks/ubuntu:24.04
+  podTemplate:
+    spec:
+      nodeSelector:
+        baremetal: "true"
   storage:
     storageClassName: replicated-x3-block-store
     accessModes:
       - ReadWriteOnce
-    volumeMode: Filesystem
+    volumeMode: Block
     resources:
       requests:
         storage: 20Gi
@@ -25,6 +29,9 @@ metadata:
 spec:
   runStrategy: Always
   template:
+    spec:
+      nodeSelector:
+        baremetal: "true"
     metadata:
       labels:
         kubevirt.io/domain: ubuntu-vm
