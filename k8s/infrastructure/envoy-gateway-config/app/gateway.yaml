@@ -84,3 +84,20 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: tcp-gateway
+  namespace: envoy-gateway-system
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: "192.168.1.72"
+spec:
+  gatewayClassName: envoy
+  listeners:
+  - name: foo
+    protocol: TCP
+    port: 8088
+    allowedRoutes:
+      kinds:
+      - kind: TCPRoute
