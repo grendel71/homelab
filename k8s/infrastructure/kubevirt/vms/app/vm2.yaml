@@ -1,0 +1,65 @@
+---
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: vm2-vm-rootdisk
+  namespace: kubevirt
+spec:
+  source:
+    registry:
+      url: docker://quay.io/containerdisks/debian:13
+  storage:
+    storageClassName: replicated-x3-block-store
+    accessModes:
+      - ReadWriteOnce
+    volumeMode: Block
+    resources:
+      requests:
+        storage: 10Gi
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: vm2-vm
+  namespace: kubevirt
+spec:
+  runStrategy: Always
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: vm2-vm
+    spec:
+      nodeSelector:
+        baremetal: "true"
+      domain:
+        resources:
+          requests:
+            memory: 8Gi
+            cpu: "4"
+        devices:
+          inputs:
+            - type: tablet
+              bus: usb
+              name: tablet-usb
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+      volumes:
+        - name: rootdisk
+          dataVolume:
+            name: vm2-vm-rootdisk
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              users:
+                - name: blau
+                  groups: sudo
+                  shell: /bin/bash
+                  sudo: ALL=(ALL) NOPASSWD:ALL
+                  ssh_authorized_keys:
+                    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFnx/ZGyG6ED/Pe1SUWEDeGhuAl5PV6thdet6Pu9p55z blau@blau-pc

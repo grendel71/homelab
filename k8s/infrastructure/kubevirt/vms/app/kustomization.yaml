@@ -4,4 +4,5 @@ kind: Kustomization
 resources:
   - test.yaml
   - tcp-ubuntu.yaml
+  - vm2.yaml
 
