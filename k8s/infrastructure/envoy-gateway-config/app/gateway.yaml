@@ -99,5 +99,7 @@ spec:
     protocol: TCP
     port: 8088
     allowedRoutes:
+      namespaces:
+        from: All
       kinds:
       - kind: TCPRoute
