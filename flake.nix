@@ -2,7 +2,7 @@
   description = "Talos + kubectl development shell";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     sops-nix.url = "github:Mic92/sops-nix";
   };
 
@@ -21,15 +21,18 @@
               sops
               age
               ssh-to-age
-	      fluxcd
-	      velero
-	      terraform
+              kubevirt
+              fluxcd
+              velero
+              terraform
+              virt-viewer
+              google-cloud-sdk
             ];
 
             shellHook = ''
               export KUBECONFIG="$PWD/.kubeconfig.dev"
 
-	      export SOPS_AGE_KEY_FILE=./age.agekey
+	            export SOPS_AGE_KEY=$(cat ./age.agekey)
               # Talos config in-repo doesn't include nodes by default; talosctl then requires
               # specifying --nodes on every command. Keep the original as a source of truth,
               # but generate a dev config with nodes pre-set.

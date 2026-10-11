@@ -7,5 +7,10 @@ export AWS_SECRET_ACCESS_KEY=$(kubectl -n rook-ceph get secret rook-ceph-object-
 export AWS_DEFAULT_REGION=us-east-1
 export S3_ENDPOINT=https://s3.envoy.grendel71.net
 
+# RGW does not support CRC64NVME trailer checksums (default in AWS CLI >=2.21);
+# without these, PUT requests fail with XAmzContentSHA256Mismatch.
+export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+
 echo "S3 credentials set. Use:"
 echo "  aws s3 <command> --endpoint-url \$S3_ENDPOINT"
