@@ -7,7 +7,7 @@ metadata:
 spec:
   source:
     registry:
-      url: docker://quay.io/containerdisks/debian:13
+      url: docker://bhcr8192.duckdns.org/nixos-dev:latest
   storage:
     storageClassName: replicated-x3-block-store
     accessModes:
@@ -45,21 +45,7 @@ spec:
             - name: rootdisk
               disk:
                 bus: virtio
-            - name: cloudinitdisk
-              disk:
-                bus: virtio
       volumes:
         - name: rootdisk
           dataVolume:
             name: vm2-vm-rootdisk
-        - name: cloudinitdisk
-          cloudInitNoCloud:
-            userData: |
-              #cloud-config
-              users:
-                - name: blau
-                  groups: sudo
-                  shell: /bin/bash
-                  sudo: ALL=(ALL) NOPASSWD:ALL
-                  ssh_authorized_keys:
-                    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFnx/ZGyG6ED/Pe1SUWEDeGhuAl5PV6thdet6Pu9p55z blau@blau-pc
