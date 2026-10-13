@@ -3,6 +3,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - arc.yaml
+  - arc-oci.yaml
   - cert-manager.yaml
   - cnpg.yaml
   - envoy-gateway.yaml
