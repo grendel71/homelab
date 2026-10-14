@@ -7,7 +7,7 @@ metadata:
 spec:
   source:
     registry:
-      url: docker://bhcr8192.duckdns.org/nixos-dev:latest
+      url: docker://bhcr8192.duckdns.org/nixos:latest
   storage:
     storageClassName: replicated-x3-block-store
     accessModes:
