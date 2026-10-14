@@ -16,8 +16,8 @@ spec:
         containers:
           app:
             image:
-              repository: ghcr.io/grendel71/leaderboard-api
-              tag: sha-fc3971d
+              repository: bhcr8192.duckdns.org/leaderboard-api
+              tag: sha-f78000b
             ports:
               - name: http
                 containerPort: 8080
@@ -46,8 +46,8 @@ spec:
         containers:
           app:
             image:
-              repository: ghcr.io/grendel71/leaderboard-web
-              tag: sha-fc3971d
+              repository: bhcr8192.duckdns.org/leaderboard-web
+              tag: sha-f78000b
             ports:
               - name: http
                 containerPort: 80
