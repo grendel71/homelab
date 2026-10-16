@@ -22,6 +22,9 @@
               (kubectl.withKrewPlugins (plugins : [
 			plugins.modify-secret
 			plugins.rook-ceph
+      plugins.ktop
+      plugins.ns
+      plugins.open-svc
 
 		]))
             ] ++ (with pkgs; [
