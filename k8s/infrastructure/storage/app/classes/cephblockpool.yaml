@@ -5,5 +5,19 @@ metadata:
   namespace: rook-ceph
 spec:
   failureDomain: host
+  deviceClass: ssd
   replicated:
     size: 2
+---
+apiVersion: ceph.rook.io/v1
+kind: CephBlockPool
+metadata:
+  name: builtin-mgr
+  namespace: rook-ceph
+spec:
+  name: .mgr
+  failureDomain: host
+  deviceClass: ssd
+  replicated:
+    size: 2
+    requireSafeReplicaSize: false

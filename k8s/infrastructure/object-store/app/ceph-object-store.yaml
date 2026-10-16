@@ -7,11 +7,13 @@ metadata:
 spec:
   metadataPool:
     failureDomain: host
+    deviceClass: ssd
     replicated:
       size: 2
       requireSafeReplicaSize: false
   dataPool:
     failureDomain: host
+    deviceClass: ssd
     replicated:
       size: 2
       requireSafeReplicaSize: false
