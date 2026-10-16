@@ -4,18 +4,27 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     sops-nix.url = "github:Mic92/sops-nix";
+		krew2nix.url = "github:eigengrau/krew2nix";
   };
 
-  outputs = { self, nixpkgs, sops-nix }:
+  outputs = { self, nixpkgs, sops-nix, krew2nix, ...}:
     let
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
     in {
       devShells = forAllSystems (system:
-        let pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
+        let 
+          pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
+          kubectl = krew2nix.packages.${system}.kubectl;
         in {
           default = pkgs.mkShell {
-            buildInputs = with pkgs; [
+            buildInputs = [
+              (kubectl.withKrewPlugins (plugins : [
+			plugins.modify-secret
+			plugins.rook-ceph
+
+		]))
+            ] ++ (with pkgs; [
               talosctl
               kubectl
               sops
@@ -27,7 +36,7 @@
               terraform
               virt-viewer
               google-cloud-sdk
-            ];
+            ]);
 
             shellHook = ''
               export KUBECONFIG="$PWD/.kubeconfig.dev"
