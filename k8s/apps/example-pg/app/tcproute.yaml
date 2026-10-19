@@ -1,0 +1,15 @@
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: example-pg
+  namespace: apps
+spec:
+  parentRefs:
+    - name: tcp-gateway
+      namespace: envoy-gateway-system
+      sectionName: foo
+  rules:
+    - backendRefs:
+        - name: example-pg-rw
+          namespace: apps
+          port: 5432
