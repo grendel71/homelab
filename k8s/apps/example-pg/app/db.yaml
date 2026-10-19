@@ -9,8 +9,6 @@ spec:
     initdb:
       database: example
       owner: example
-      secret:
-        name: example-db-secret
   storage:
     size: 5Gi
     storageClass: replicated-x3-block-store

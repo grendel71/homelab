@@ -5,7 +5,7 @@ metadata:
   name: example-db
   namespace: flux-system
 spec:
-  targetNamespace: authentik
+  targetNamespace: apps
   interval: 30m
   path: ./k8s/apps/example-pg/app
   prune: true
