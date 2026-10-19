@@ -19,4 +19,4 @@ resources:
   - leaderboard/ks.yaml
   - firefox/ks.yaml
   - searxng/ks.yaml
-
+  - example-pg/ks.yaml

@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: example-pg
+  namespace: apps
+spec:
+  instances: 1
+  bootstrap:
+    initdb:
+      database: example
+      owner: example
+      secret:
+        name: example-db-secret
+  storage:
+    size: 5Gi
+    storageClass: replicated-x3-block-store
