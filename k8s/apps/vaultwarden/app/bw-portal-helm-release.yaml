@@ -23,6 +23,9 @@ spec:
             image:
               repository: bhcr8192.duckdns.org/bitwarden-portal
               tag: "1761076800" # {"$imagepolicy": "vaultwarden:bitwarden-portal-policy:tag"}
+            ports:
+              - name: http
+                containerPort: 8000
             envFrom:
               - secretRef:
                   name: bw-portal-secret
@@ -39,3 +42,10 @@ spec:
         globalMounts:
           - path: /app/backups
             subPath: bw-portal
+    service:
+      bitwarden-portal:
+        forceRename: bitwarden-portal
+        controller: bw-portal
+        ports:
+          http:
+            port: 8000
