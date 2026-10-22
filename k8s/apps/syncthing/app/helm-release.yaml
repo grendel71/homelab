@@ -19,8 +19,8 @@ spec:
               repository: lscr.io/linuxserver/syncthing
               tag: latest
             env:
-              PUID: "1000"
-              PGID: "1000"
+              PUID: "3000"
+              PGID: "3000"
               TZ: America/New_York
             ports:
               - name: webui
