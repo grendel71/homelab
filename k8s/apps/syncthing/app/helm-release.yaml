@@ -12,7 +12,7 @@ spec:
   values:
     controllers:
       syncthing:
-        strategy: RollingUpdate
+        strategy: Recreate
         containers:
           app:
             image:
