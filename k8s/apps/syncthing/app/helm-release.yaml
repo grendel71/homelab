@@ -40,7 +40,7 @@ spec:
         existingClaim: syncthing-nc-pvc
         globalMounts:
           - path: /data
-            subPath: syncthing
+            subPath: nextcloud
     service:
       app:
         forceRename: syncthing
