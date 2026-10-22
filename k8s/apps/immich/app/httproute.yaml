@@ -6,11 +6,11 @@ metadata:
   namespace: immich
 spec:
   parentRefs:
-    - name: envoy-internal
+    - name: envoy-nx
       namespace: envoy-gateway-system
       sectionName: websecure
   hostnames:
-    - immich.internal.grendel71.net
+    - immich.x.nx8192.win
   rules:
     - matches:
         - path:
