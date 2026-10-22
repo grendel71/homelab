@@ -43,6 +43,7 @@ spec:
             subPath: syncthing
     service:
       app:
+        forceRename: syncthing
         controller: syncthing
         ports:
           webui:
