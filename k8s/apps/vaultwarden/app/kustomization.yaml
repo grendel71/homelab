@@ -10,3 +10,4 @@ resources:
   - secret-bw-portal.yaml
   - bw-portal-helm-release.yaml
   - image.yaml
+  - cron.yaml

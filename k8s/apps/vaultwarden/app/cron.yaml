@@ -1,0 +1,19 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vaultwarden-daily
+  namespace: vaultwarden
+spec:
+  concurrencyPolicy: "Forbid"
+  schedule: "10 0 * * *"
+  timezone: "America/New_York"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: ingestion
+              image: curlimages/curl:8.17.0
+              imagePullPolicy: IfNotPresent
+              args: ["-X", "POST", "http://bitwarden-portal.vaultwarden.svc:8000/api/backup"]
+          restartPolicy: OnFailure
