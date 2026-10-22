@@ -1,0 +1,37 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: arc-runner-bitwarden
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  releaseName: runner-bitwarden
+  targetNamespace: arc-runners
+  chart:
+    spec:
+      chart: gha-runner-scale-set
+      version: 0.15.0
+      sourceRef:
+        kind: HelmRepository
+        name: arc-gha
+  values:
+    githubConfigUrl: https://github.com/grendel71/bitwarden-portal
+    githubConfigSecret: arc-github-app
+    runnerScaleSetName: runner-bitwarden
+    minRunners: 0
+    maxRunners: 2
+    controllerServiceAccount:
+      namespace: arc-systems
+      name: gha-runner-scale-set-controller
+    containerMode:
+      type: dind
+    template:
+      spec:
+        containers:
+          - name: runner
+            image: ghcr.io/actions/actions-runner:2.337.0
+            command: ["/home/runner/run.sh"]
+            env:
+              - name: REGISTRY
+                value: bhcr8192.duckdns.org

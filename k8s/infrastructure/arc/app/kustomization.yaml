@@ -4,3 +4,4 @@ resources:
   - runner-site.yaml
   - scale-set-site.yaml
   - scale-set-leaderboard.yaml
+  - scale-set-bw.yaml
