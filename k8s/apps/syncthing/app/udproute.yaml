@@ -1,0 +1,16 @@
+---
+# UDPRoute for syncthing local discovery (port 21027/udp)
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: syncthing-discovery
+  namespace: apps
+spec:
+  parentRefs:
+    - name: envoy-nx
+      namespace: envoy-gateway-system
+      sectionName: syncthing-discovery
+  rules:
+    - backendRefs:
+        - name: syncthing-discovery
+          port: 21027

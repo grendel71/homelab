@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: syncthing-config-pvc
+  namespace: apps
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: replicated-x3-block-store
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 5Gi

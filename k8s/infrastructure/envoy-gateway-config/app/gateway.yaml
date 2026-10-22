@@ -84,6 +84,24 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    # Syncthing sync protocol (TCP)
+    - name: syncthing-sync
+      protocol: TCP
+      port: 22000
+      allowedRoutes:
+        namespaces:
+          from: All
+        kinds:
+          - kind: TCPRoute
+    # Syncthing local discovery (UDP)
+    - name: syncthing-discovery
+      protocol: UDP
+      port: 21027
+      allowedRoutes:
+        namespaces:
+          from: All
+        kinds:
+          - kind: UDPRoute
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway

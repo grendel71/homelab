@@ -1,0 +1,16 @@
+---
+# TCPRoute for syncthing sync protocol (port 22000/tcp)
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: syncthing-sync
+  namespace: apps
+spec:
+  parentRefs:
+    - name: envoy-nx
+      namespace: envoy-gateway-system
+      sectionName: syncthing-sync
+  rules:
+    - backendRefs:
+        - name: syncthing-sync
+          port: 22000
