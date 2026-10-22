@@ -9,3 +9,4 @@ resources:
   - data-pvc.yaml
   - secret-bw-portal.yaml
   - bw-portal-helm-release.yaml
+  - image.yaml

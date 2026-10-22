@@ -21,8 +21,8 @@ spec:
         containers:
           app:
             image:
-              repository: ghcr.io/grendel71/bitwarden-portal
-              tag: latest
+              repository: bhcr8192.duckdns.org/bitwarden-portal
+              tag: "1761076800" # {"$imagepolicy": "vaultwarden:bitwarden-portal-policy:tag"}
             envFrom:
               - secretRef:
                   name: bw-portal-secret

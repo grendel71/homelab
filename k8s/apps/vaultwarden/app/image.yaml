@@ -1,0 +1,45 @@
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: bitwarden-portal
+  namespace: vaultwarden
+spec:
+  image: bhcr8192.duckdns.org/bitwarden-portal
+  interval: 10m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: bitwarden-portal-policy
+  namespace: vaultwarden
+spec:
+  imageRepositoryRef:
+    name: bitwarden-portal
+  filterTags:
+    pattern: '^\d{10}$'
+  policy:
+    numerical:
+      order: asc
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: bitwarden-portal-update
+  namespace: vaultwarden
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  git:
+    commit:
+      author:
+        email: fluxcdbot@users.noreply.github.com
+        name: fluxcdbot
+    push:
+      branch: main
+  update:
+    strategy: Setters
+    path: ./k8s/apps/vaultwarden/app
