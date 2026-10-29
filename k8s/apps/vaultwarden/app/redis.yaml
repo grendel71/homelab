@@ -1,0 +1,54 @@
+---
+# Standalone Redis for the bw-portal job queue (RQ).
+# RQ does not support Redis Cluster, so this uses the standalone `redis` chart
+# with the redis-operator that is installed in kube-system.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: bw-portal-redis
+  namespace: vaultwarden
+spec:
+  interval: 30m
+  releaseName: bw-portal-redis
+  # The operator installs the Redis CRDs. Wait for it on first install.
+  dependsOn:
+    - name: redis-operator
+      namespace: flux-system
+  chart:
+    spec:
+      chart: redis
+      version: 0.16.10
+      sourceRef:
+        kind: HelmRepository
+        name: redis
+        namespace: flux-system
+      interval: 12h
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    redisStandalone:
+      name: bw-portal-redis
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+    # Creates a ClusterIP Service with a fixed name: bw-portal-redis-external-service
+    externalService:
+      enabled: true
+      serviceType: ClusterIP
+      port: 6379
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: replicated-x3-block-store
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi

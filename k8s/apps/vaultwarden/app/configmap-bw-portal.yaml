@@ -1,0 +1,11 @@
+---
+# Non-secret settings shared by the bw-portal API and worker.
+# REDIS_HOST is the Service created by the bw-portal-redis release (same namespace).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bw-portal-config
+  namespace: vaultwarden
+data:
+  REDIS_HOST: bw-portal-redis-external-service
+  REDIS_PORT: "6379"

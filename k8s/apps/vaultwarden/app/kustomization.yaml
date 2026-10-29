@@ -8,6 +8,8 @@ resources:
   - httproute.yaml
   - data-pvc.yaml
   - secret-bw-portal.yaml
+  - configmap-bw-portal.yaml
+  - redis.yaml
   - bw-portal-helm-release.yaml
   - image.yaml
   - cron.yaml

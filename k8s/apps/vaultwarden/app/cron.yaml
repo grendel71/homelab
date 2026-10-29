@@ -15,5 +15,12 @@ spec:
             - name: ingestion
               image: curlimages/curl:8.17.0
               imagePullPolicy: IfNotPresent
-              args: ["-X", "POST", "http://bitwarden-portal.vaultwarden.svc:8000/api/backup"]
+              # --fail-with-body makes curl exit non-zero on HTTP 4xx/5xx, so a
+              # failed request fails the Job. The response body shows the job id.
+              args:
+                - "-sS"
+                - "--fail-with-body"
+                - "-X"
+                - "POST"
+                - "http://bitwarden-portal.vaultwarden.svc:8000/api/queueBackup"
           restartPolicy: OnFailure

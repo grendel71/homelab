@@ -21,4 +21,4 @@ resources:
   - vaultwarden.yaml
   - kubevirt.yaml
   - searxng.yaml
-
+  - redis.yaml

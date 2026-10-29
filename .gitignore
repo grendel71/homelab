@@ -20,3 +20,6 @@ terraform/*.tfstate
 terraform/*.tfstate.backup
 terraform/generated/
 scripts/pappwiki-migration/__pycache__/
+
+# etcd snapshots (contain cluster secrets)
+etcd-*.db
