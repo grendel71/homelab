@@ -21,6 +21,7 @@ resources:
   - ingress/ks.yaml
   - arc/ks.yaml
   - nvidia-operator/ks.yaml
+  - metrics-server/ks.yaml
   - velero/ks.yaml
   - crds/ks.yaml
   - infra-secrets/ks.yaml

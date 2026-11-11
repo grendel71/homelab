@@ -1,0 +1,27 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: metrics-server
+  namespace: kube-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: metrics-server
+      version: 3.x
+      sourceRef:
+        kind: HelmRepository
+        name: metrics-server
+        namespace: flux-system
+      interval: 12h
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    args:
+      # Talos kubelet serving certs are self-signed (serverTLSBootstrap is off).
+      - --kubelet-insecure-tls
+      - --kubelet-preferred-address-types=InternalIP,Hostname

@@ -9,6 +9,7 @@ resources:
   - envoy-gateway.yaml
   - immich.yaml
   - metallb.yaml
+  - metrics-server.yaml
   - nfs-subdir.yaml
   - nvoperator.yaml
   - open-webui.yaml
