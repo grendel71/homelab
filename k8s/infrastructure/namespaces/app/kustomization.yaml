@@ -21,3 +21,4 @@ resources:
   - payments.yaml
   - torrent.yaml
   - leaderboard.yaml
+  - ai.yaml

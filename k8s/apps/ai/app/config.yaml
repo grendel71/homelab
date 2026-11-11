@@ -1,0 +1,16 @@
+# Hermes Agent config. Copied to /opt/data/config.yaml by the init container.
+# Full reference:
+# https://github.com/NousResearch/hermes-agent/blob/main/cli-config.yaml.example
+model:
+  default: "deepseek-v4-pro"
+  provider: "deepseek"
+  base_url: "https://api.deepseek.com/v1"
+
+terminal:
+  backend: "local"
+  cwd: "/opt/data"
+  timeout: 180
+
+compression:
+  enabled: true
+  threshold: 0.50
