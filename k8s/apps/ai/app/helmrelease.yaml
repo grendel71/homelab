@@ -13,6 +13,8 @@ spec:
     controllers:
       hermes:
         strategy: Recreate
+        serviceAccount:
+          name: hermes
         initContainers:
           init:
             image:
