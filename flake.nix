@@ -36,7 +36,6 @@
               kubevirt
               fluxcd
               velero
-              terraform
               virt-viewer
               google-cloud-sdk
             ]);
@@ -51,8 +50,11 @@
               export TALOSCONFIG="$PWD/.talosconfig.dev"
 
               # Edit these to match your cluster.
+              # CONTROL_PLANE_IPS is the kube-vip VIP (Talos API endpoint).
+              # NODE_IPS are the real node addresses (excluding the VIP).
               export CONTROL_PLANE_IPS="192.168.1.100"
-              export WORKER_IPS="192.168.1.158"
+              export CONTROL_PLANE_NODE_IPS="192.168.1.145 192.168.1.176 192.168.1.154"
+              export WORKER_IPS="192.168.1.103 192.168.1.215 192.168.1.144 192.168.1.233"
 
               # Used by some scripts/tools (Kubernetes API endpoint, not Talos API).
               export ENDPOINT="https://192.168.1.100:6443"
@@ -64,7 +66,7 @@
                 # Use control plane nodes as Talos API endpoints.
                 talosctl config endpoint $CONTROL_PLANE_IPS >/dev/null 2>&1 || true
                 # Target all nodes by default.
-                talosctl config node $CONTROL_PLANE_IPS $WORKER_IPS >/dev/null 2>&1 || true
+                talosctl config node $CONTROL_PLANE_NODE_IPS $WORKER_IPS >/dev/null 2>&1 || true
               fi
 
               if [ -f "$PWD/secrets/kubeconfig.sops.yaml" ]; then

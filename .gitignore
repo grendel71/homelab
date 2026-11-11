@@ -13,12 +13,6 @@ workernvme.yaml
 talos-infra
 patches/
 .opencode
-# Terraform
-terraform/*.tfvars
-terraform/.terraform/
-terraform/*.tfstate
-terraform/*.tfstate.backup
-terraform/generated/
 scripts/pappwiki-migration/__pycache__/
 
 # etcd snapshots (contain cluster secrets)
