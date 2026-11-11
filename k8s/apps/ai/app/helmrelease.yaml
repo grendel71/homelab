@@ -62,6 +62,7 @@ spec:
               limits:
                 memory: 4Gi
     defaultPodOptions:
+      automountServiceAccountToken: true
       securityContext:
         fsGroup: 10000
         fsGroupChangePolicy: OnRootMismatch
