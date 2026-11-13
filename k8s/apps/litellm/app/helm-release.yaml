@@ -1,0 +1,52 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: litellm
+  namespace: litellm
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: litellm
+      version: "1.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: litellm
+        namespace: flux-system
+      interval: 12h
+  values:
+    image:
+      tag: lts
+    # Single Deployment serving gateway + management API + UI. Keeps the
+    # HTTPRoute to one backendRef (litellm:4000).
+    fullnameOverride: litellm
+    monolith:
+      enabled: true
+    # In-cluster CloudNativePG cluster (see db.yaml).
+    database:
+      writer:
+        host: litellm-db-rw
+        dbname: litellm
+        passwordSecret:
+          name: litellm-db-secret
+    # In-cluster redis-operator standalone (see redis.yaml). No TLS on the
+    # internal link, so the ArgoCD `ssl`/`sslCertReqs` flags are dropped.
+    redis:
+      host: litellm-redis-external-service
+      passwordSecret:
+        name: litellm-redis
+    gateway:
+      envSecrets:
+        - litellm-env
+      extraEnv:
+        - name: STORE_MODEL_IN_DB
+          value: "True"
+    # FluxCD runs migrations as a Helm pre-install/pre-upgrade hook (the
+    # ArgoCD PreSync hook is not used).
+    migrationJob:
+      hooks:
+        helm:
+          enabled: true
+        argocd:
+          enabled: false

@@ -22,3 +22,4 @@ resources:
   - torrent.yaml
   - leaderboard.yaml
   - ai.yaml
+  - litellm.yaml

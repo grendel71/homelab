@@ -23,3 +23,4 @@ resources:
   - kubevirt.yaml
   - searxng.yaml
   - redis.yaml
+  - litellm.yaml
