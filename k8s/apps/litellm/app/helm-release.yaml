@@ -9,20 +9,17 @@ spec:
   chart:
     spec:
       chart: litellm
-      version: "1.0.0"
+      version: "1.109.1"
       sourceRef:
         kind: HelmRepository
         name: litellm
         namespace: flux-system
       interval: 12h
   values:
-    image:
-      tag: lts
-    # Single Deployment serving gateway + management API + UI. Keeps the
-    # HTTPRoute to one backendRef (litellm:4000).
+    # Image tags default to the chart appVersion (v1.109.1), so the chart
+    # version pins the images too.
+    # Gives clean Service names: litellm-gateway, litellm-backend, litellm-ui.
     fullnameOverride: litellm
-    monolith:
-      enabled: true
     # In-cluster CloudNativePG cluster (see db.yaml).
     database:
       writer:
@@ -37,6 +34,12 @@ spec:
       passwordSecret:
         name: litellm-redis
     gateway:
+      envSecrets:
+        - litellm-env
+      extraEnv:
+        - name: STORE_MODEL_IN_DB
+          value: "True"
+    backend:
       envSecrets:
         - litellm-env
       extraEnv:
