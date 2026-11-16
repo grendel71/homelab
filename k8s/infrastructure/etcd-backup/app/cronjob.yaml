@@ -44,6 +44,12 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: status.hostIP
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                seccompProfile:
+                  type: RuntimeDefault
               volumeMounts:
                 - name: snapshots
                   mountPath: /snapshots
@@ -60,7 +66,7 @@ spec:
                   TS=$(date -u +%Y%m%dT%H%M%SZ)
                   FILE="etcd-${TS}.snapshot"
                   mv /snapshots/etcd.snapshot "/snapshots/${FILE}"
-                  aws s3 cp "/snapshots/${FILE}" "s3://velero/etcd/${FILE}" --endpoint-url "${S3_ENDPOINT}"
+                  aws s3 cp --no-progress "/snapshots/${FILE}" "s3://velero/etcd/${FILE}" --endpoint-url "${S3_ENDPOINT}"
                   CUTOFF=$(date -u -d '7 days ago' +%Y-%m-%d)
                   aws s3 ls "s3://velero/etcd/" --endpoint-url "${S3_ENDPOINT}" | while read -r d t size key; do
                     if [ -n "${key}" ] && [ "${d}" \< "${CUTOFF}" ]; then
@@ -76,6 +82,12 @@ spec:
                   value: when_required
                 - name: AWS_RESPONSE_CHECKSUM_VALIDATION
                   value: when_required
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                seccompProfile:
+                  type: RuntimeDefault
               volumeMounts:
                 - name: snapshots
                   mountPath: /snapshots
