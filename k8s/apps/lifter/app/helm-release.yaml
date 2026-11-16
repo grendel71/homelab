@@ -17,7 +17,7 @@ spec:
             image:
               repository: bhcr8192.duckdns.org/lifter-api
               # Flux image automation sets this to the newest epoch tag.
-              tag: "latest" # {"$imagepolicy": "lifter:lifter-api-policy:tag"}
+              tag: "1794803174" # {"$imagepolicy": "lifter:lifter-api-policy:tag"}
             ports:
               - name: http
                 containerPort: 8000
