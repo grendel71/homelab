@@ -1,0 +1,136 @@
+---
+# leaderboard (namespace leaderboard): web (:80) + api (:8080) + CNPG cluster leaderboard-db.
+# HelmRelease app-template (k8s/apps/leaderboard/app/helm-release.yaml).
+# Public route strength.grendel71.net on envoy-external -> Service web:80 (rules.backendRefs web:80).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: leaderboard-web-ingress
+  namespace: leaderboard
+spec:
+  # Live: 1 Running pod (leaderboard-web-*).
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: leaderboard
+      app.kubernetes.io/instance: leaderboard
+      app.kubernetes.io/controller: web
+  ingress:
+    # Envoy proxy of the external gateway -> web, TCP 80 only (containerPort http).
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+            app.kubernetes.io/name: envoy
+            app.kubernetes.io/component: proxy
+            gateway.envoyproxy.io/owning-gateway-name: envoy-external
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+---
+# api: not routed publicly (the HTTPRoute only has the web backend), reached
+# only by the web pod (INFERRED, not provable from git: the SPA/proxy in the web
+# image must reach Service api:8080, since the route has no api backend).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: leaderboard-api-ingress
+  namespace: leaderboard
+spec:
+  # Live: 1 Running pod (leaderboard-api-*).
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: leaderboard
+      app.kubernetes.io/instance: leaderboard
+      app.kubernetes.io/controller: api
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: leaderboard
+            app.kubernetes.io/instance: leaderboard
+            app.kubernetes.io/controller: web
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+---
+# leaderboard-db (CNPG). Ingress default-deny: the api pod on 5432 (env points at
+# leaderboard-db-rw:5432; only the api has DB credentials), the CNPG operator
+# (8000 + 5432) and instances of the same cluster. Egress is OPEN (CNPG instance
+# pods must reach the API server and replicas).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: leaderboard-db-ingress
+  namespace: leaderboard
+spec:
+  # Live: 1 Running pod (leaderboard-db-1).
+  endpointSelector:
+    matchLabels:
+      cnpg.io/cluster: leaderboard-db
+      cnpg.io/podRole: instance
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: leaderboard
+            app.kubernetes.io/instance: leaderboard
+            app.kubernetes.io/controller: api
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            app.kubernetes.io/name: cloudnative-pg
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+            - port: "5432"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            cnpg.io/cluster: leaderboard-db
+            cnpg.io/podRole: instance
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+            - port: "8000"
+              protocol: TCP
+---
+# Egress: block access to the LAN and to the cluster nodes (SSRF / lateral
+# movement from a public-facing app), keep everything else open.
+#  * Nothing in the manifests points these pods at a LAN or node address: the
+#    full env of both containers is in helm-release.yaml (DB host
+#    leaderboard-db-rw, in-cluster, and app settings only). Image pulls and the
+#    NFS/CSI mounts are done by the kubelet on the host, not by pod traffic.
+#  * enableDefaultDeny.egress=false is REQUIRED: with the chart default
+#    enableNonDefaultDenyPolicies=true a policy that only has egressDeny would
+#    otherwise switch the pods to egress default-deny and drop all egress.
+#  * `host` + `remote-node` also cover the kube-apiserver (control-plane node
+#    IPs 192.168.1.145/.176/.154 and VIP .100 via the CIDR). These apps do not
+#    use the Kubernetes API (no ServiceAccount use, no k8s client in the env).
+#  * Deny wins over allow in Cilium, so no LAN destination is allowed here. If a
+#    LAN dependency is ever added (SMTP relay, NFS client, LDAP...), carve it out
+#    by changing this policy (deny with except), not by adding an allow.
+#  * Pod CIDR 10.244.0.0/16 and service CIDR 10.96.0.0/12 are NOT inside
+#    192.168.0.0/16, so DNS, the DB and api<->web keep working.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: leaderboard-egress-deny-lan
+  namespace: leaderboard
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: leaderboard
+      app.kubernetes.io/instance: leaderboard
+  enableDefaultDeny:
+    egress: false
+  egressDeny:
+    - toCIDRSet:
+        - cidr: 192.168.0.0/16
+    - toEntities:
+        - host
+        - remote-node

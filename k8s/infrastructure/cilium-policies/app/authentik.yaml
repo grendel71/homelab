@@ -1,0 +1,124 @@
+---
+# authentik (namespace authentik): server + worker (Helm chart authentik 2026.8.x,
+# k8s/apps/authentik/app/helm-release.yaml) and the CNPG cluster authentik-db.
+# Public route: ak.grendel71.net on envoy-external -> Service authentik-server:80
+# (k8s/apps/authentik/app/httproute.yaml), which targets the container port
+# `http` = 9000 (live: kubectl get pod -n authentik -o jsonpath ... .ports).
+# No config, outpost, SSO or SMTP setting of authentik is touched here.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: authentik-server-ingress
+  namespace: authentik
+spec:
+  # Live: 1 Running pod (authentik-server-*).
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: authentik
+      app.kubernetes.io/instance: authentik
+      app.kubernetes.io/component: server
+  ingress:
+    # Envoy proxy of the external gateway -> authentik server, TCP 9000 only.
+    # 9443 (https) and 9300 (metrics) are not used: the route backend is
+    # Service port 80 (-> 9000) and there is no Prometheus in the cluster.
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+            app.kubernetes.io/name: envoy
+            app.kubernetes.io/component: proxy
+            gateway.envoyproxy.io/owning-gateway-name: envoy-external
+      toPorts:
+        - ports:
+            - port: "9000"
+              protocol: TCP
+    # Worker -> server inside the app (defensive: same chart, same namespace,
+    # same trust domain; authentik components can call each other's API, e.g.
+    # outpost reconciliation). Not provable from the manifests, harmless.
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: authentik
+            app.kubernetes.io/instance: authentik
+            app.kubernetes.io/component: worker
+      toPorts:
+        - ports:
+            - port: "9000"
+              protocol: TCP
+            - port: "9443"
+              protocol: TCP
+---
+# Worker: no Service and no consumer found (nothing reaches it; it talks to
+# PostgreSQL). Ingress default-deny with only the server allowed (defensive,
+# same reasoning as above). Probes come from the local kubelet (always allowed).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: authentik-worker-ingress
+  namespace: authentik
+spec:
+  # Live: 1 Running pod (authentik-worker-*).
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: authentik
+      app.kubernetes.io/instance: authentik
+      app.kubernetes.io/component: worker
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: authentik
+            app.kubernetes.io/instance: authentik
+            app.kubernetes.io/component: server
+      toPorts:
+        - ports:
+            - port: "9000"
+              protocol: TCP
+---
+# authentik-db (CNPG). Ingress default-deny: server+worker on 5432
+# (helm-release.yaml: authentik.postgresql.host authentik-db-rw.authentik.svc),
+# CNPG operator (8000 status + 5432), instances of the same cluster.
+# Egress is OPEN (CNPG instance pods must reach the API server and replicas).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: authentik-db-ingress
+  namespace: authentik
+spec:
+  # Live: 1 Running pod (authentik-db-1).
+  endpointSelector:
+    matchLabels:
+      cnpg.io/cluster: authentik-db
+      cnpg.io/podRole: instance
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: authentik
+            app.kubernetes.io/instance: authentik
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            app.kubernetes.io/name: cloudnative-pg
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+            - port: "5432"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            cnpg.io/cluster: authentik-db
+            cnpg.io/podRole: instance
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+            - port: "8000"
+              protocol: TCP
+# EGRESS for server/worker is deliberately NOT restricted (default allow-all):
+# authentik legitimately reaches many destinations that are configured in its
+# UI/DB, not in git: SMTP, OAuth/OIDC/SAML sources, LDAP sources, webhooks,
+# GeoIP/error reporting (`error_reporting.enabled: true` in the HelmRelease),
+# and the Kubernetes API for integrated outposts. None of that can be proven
+# from the manifests, so no egress rule is written.
