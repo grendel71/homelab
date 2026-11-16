@@ -24,3 +24,4 @@ resources:
   - ai.yaml
   - litellm.yaml
   - lifter.yaml
+  - backup.yaml

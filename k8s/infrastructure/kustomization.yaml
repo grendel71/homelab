@@ -26,6 +26,7 @@ resources:
   - nvidia-operator/ks.yaml
   - metrics-server/ks.yaml
   - velero/ks.yaml
+  - etcd-backup/ks.yaml
   - crds/ks.yaml
   - infra-secrets/ks.yaml
   - infra-releases/ks.yaml

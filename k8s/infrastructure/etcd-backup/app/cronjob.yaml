@@ -1,0 +1,96 @@
+---
+# Takes an etcd snapshot every 6 hours and uploads it to the SeaweedFS
+# "velero" bucket (s3://velero/etcd/). Snapshots older than 7 days are deleted.
+# The talosconfig has only the os:etcd:backup role. It expires 2027-11-16.
+# Rotate it with: talosctl -n <cp-ip> config new --roles=os:etcd:backup etcd-backup
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etcd-snapshot
+  namespace: backup
+spec:
+  schedule: "15 */6 * * *"
+  timeZone: America/New_York
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 900
+      template:
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            node-role.kubernetes.io/control-plane: ""
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+          initContainers:
+            - name: snapshot
+              image: ghcr.io/siderolabs/talosctl:v1.13.9
+              args:
+                - --talosconfig=/etc/talos/config
+                - -e
+                - $(NODE_IP)
+                - -n
+                - $(NODE_IP)
+                - etcd
+                - snapshot
+                - /snapshots/etcd.snapshot
+              env:
+                - name: NODE_IP
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.hostIP
+              volumeMounts:
+                - name: snapshots
+                  mountPath: /snapshots
+                - name: talosconfig
+                  mountPath: /etc/talos
+                  readOnly: true
+          containers:
+            - name: upload
+              image: public.ecr.aws/aws-cli/aws-cli:2.27.50
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  TS=$(date -u +%Y%m%dT%H%M%SZ)
+                  FILE="etcd-${TS}.snapshot"
+                  mv /snapshots/etcd.snapshot "/snapshots/${FILE}"
+                  aws s3 cp "/snapshots/${FILE}" "s3://velero/etcd/${FILE}" --endpoint-url "${S3_ENDPOINT}"
+                  CUTOFF=$(date -u -d '7 days ago' +%Y-%m-%d)
+                  aws s3 ls "s3://velero/etcd/" --endpoint-url "${S3_ENDPOINT}" | while read -r d t size key; do
+                    if [ -n "${key}" ] && [ "${d}" \< "${CUTOFF}" ]; then
+                      echo "deleting old snapshot ${key}"
+                      aws s3 rm "s3://velero/etcd/${key}" --endpoint-url "${S3_ENDPOINT}"
+                    fi
+                  done
+                  aws s3 ls "s3://velero/etcd/" --endpoint-url "${S3_ENDPOINT}"
+              env:
+                - name: S3_ENDPOINT
+                  value: http://192.168.1.231:30304
+                - name: AWS_REQUEST_CHECKSUM_CALCULATION
+                  value: when_required
+                - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+                  value: when_required
+              volumeMounts:
+                - name: snapshots
+                  mountPath: /snapshots
+                - name: aws-creds
+                  mountPath: /root/.aws
+                  readOnly: true
+          volumes:
+            - name: snapshots
+              emptyDir: {}
+            - name: talosconfig
+              secret:
+                secretName: etcd-backup-talosconfig
+            - name: aws-creds
+              secret:
+                secretName: etcd-backup-s3
+                items:
+                  - key: cloud
+                    path: credentials

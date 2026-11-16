@@ -11,3 +11,5 @@ resources:
   - secret-immich.yaml
   - secret-velero.yaml
   - secret-airvpn.yaml
+  - secret-etcd-backup-talosconfig.yaml
+  - secret-etcd-backup-s3.yaml
