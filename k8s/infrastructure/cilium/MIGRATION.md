@@ -2,294 +2,464 @@
 
 > Operator-only document. Flux ignores `.md`, so this folder is intentionally
 > not kustomized. Nothing here is applied automatically — a human runs these
-> steps from a shell with `nix develop` active (`direnv allow` or `nix develop`).
+> steps from a shell with the dev shell active (`direnv allow` or `nix develop`).
+> Run every command from the repo root.
 
 **Goal:** replace the Talos-bootstrapped Flannel CNI and kube-proxy with Cilium
-(kube-proxy replacement + Hubble), managed by Flux. Cilium reuses the existing
-`10.244.0.0/16` per-node podCIDRs (`ipam.mode: kubernetes`), so **pod IPs do not
-change** and no workload rescheduling is required by IPAM.
+(kube-proxy replacement + Hubble), managed by Flux.
 
-**Expected downtime:** brief, node-local pod-network blips during the mixed-CNI
-window and the rolling reboot. Control-plane API stays up via kube-vip.
-
-**Mixed Talos versions:** 2 nodes run `v1.12.6` (`talos-1i8-qm9` control-plane,
-`talos-i4x-2pd` worker), 5 run `v1.13.0`. Both are < v1.14, so the classic
-`cluster.network.cni.name` / `cluster.proxy.disabled` machine-config patch below
-applies unchanged to every node. (Talos ≥ v1.14 would need the
-`KubeFlannelCNIConfig` / `KubeProxyConfig` delete-style patches instead.)
+**State in git:** the `cilium` and `cilium-routes` Flux Kustomizations are
+**GATED** (`suspend: true`). Merging the gated manifests to `main` installs
+nothing. The cutover is a separate commit that sets `suspend: false` (step 3).
+Do **not** use `flux resume`: the parent `flux-system` Kustomization re-applies
+the files from git and reverts it.
 
 ---
 
-## 0. Safety notes
+## 0. Strategy and blast radius
 
-- **kube-vip VIP `192.168.1.100` is untouched.** The node `nodeIP`/etcd
-  `advertisedSubnets` exclusions for that VIP are unaffected by Cilium — Cilium
-  does not manage the control-plane VIP (kube-vip does) and does not take over
-  Service load-balancing (MetalLB stays). `kube-vip-ds` (DaemonSet in
-  `kube-system`) and `metallb-speaker` (DaemonSet in `metallb-system`) **must not
-  be deleted**.
-- Cilium coexists with MetalLB L2 and kube-vip: it only installs its CNI
-  datapath, `cilium-operator`, and Hubble. No L2 announcements, no LB-IPAM, no
-  BGP, no Gateway API/Ingress controller (Envoy Gateway stays).
+**Declared maintenance window: cluster-wide pod-to-pod network outage between the
+moment the first node switches CNI and the last node reboots (about 30–60 min).
+Existing pods keep running on their old IPs until their node reboots. Expect
+Flux, CNPG, Ceph clients and Envoy Gateway to be disrupted.**
+
+Why: Flannel and Cilium would both own `10.244.0.0/16` (`ipam.mode: kubernetes`
+reuses the node podCIDRs) and cannot interoperate. Flannel's overlay is VXLAN on
+UDP 4789, Cilium's on UDP 8472, so nodes on different CNIs form two islands that
+cannot reach each other's pods. Cilium's official zero-downtime migration
+(<https://docs.cilium.io/en/stable/installation/k8s-install-migration/>) needs a
+distinct pod CIDR plus `CiliumNodeConfig` and per-node rollout. We declined that
+as too complex for this cluster.
+
+What keeps working during the window (all host-network, independent of the CNI):
+the Talos API, etcd, kube-apiserver, kubelet, KubePrism (`localhost:7445`, used
+by Cilium and kubelet to reach the API), kube-vip (VIP `192.168.1.100`) and
+MetalLB speakers. So `kubectl` and `talosctl` keep working throughout.
+
+What does **not** work: anything pod-to-pod across islands. This includes **Ceph**
+(mons and OSDs run on the pod network, so Ceph is degraded/blocked mid-window and
+recovers once every node is on Cilium), CNPG replication/clients, Envoy proxies
+reaching backends, Flux controllers reaching each other, CoreDNS from remote
+pods. Pods get **new IPs** when their node reboots (new sandboxes).
+
+Consequences for the procedure:
+
+- Do everything that needs a working Flux/pod network **before** the first node
+  switches (merge, reconcile, Hubble certs).
+- Do not "wait for green" mid-window on anything that crosses the pod network.
+  The strict Ceph gates apply **before the first reboot** and again in §5
+  **before `osd unset noout`**.
+- Keep the window short: reboot back-to-back once the old stack is deleted.
 
 ## 1. Pre-checks (all must pass before starting)
 
 ```bash
-# every node Ready, and versions as expected
+# every node Ready, versions as expected (2 CP + workers on 1.13.0, 1i8-qm9 and i4x-2pd on 1.12.6)
 kubectl get nodes -o wide
 
-# control-plane API reachable through the VIP
-kubectl get --raw /readyz && echo OK
+# API reachable through the VIP, and who holds it (kube-vip leader)
+kubectl --server https://192.168.1.100:6443 get --raw /readyz; echo
+kubectl -n kube-system get lease plndr-cp-lock -o jsonpath='{.spec.holderIdentity}{"\n"}'
 
-# etcd healthy
-talosctl etcd status
-talosctl get members
+# etcd: 3 members, none learner, no errors
+talosctl --nodes 192.168.1.145,192.168.1.176,192.168.1.154 etcd status
+talosctl --nodes 192.168.1.154 etcd members
 
-# Ceph HEALTH_OK and all PGs active+clean (workers run the OSDs)
+# kube-vip healthy
+kubectl -n kube-system get ds kube-vip-ds
+
+# Ceph: HEALTH_OK, all PGs active+clean, mon quorum 3/3
 kubectl rook-ceph ceph status
 kubectl rook-ceph ceph osd tree
 
-# Envoy Gateway / MetalLB healthy (post-check baseline)
-kubectl -n envoy-gateway-system get deploy,svc
-kubectl -n metallb-system get pods
+# Baselines to diff against after the migration (pre-existing failures are normal;
+# at the time of writing: jellyfin/searxng Kustomizations, some Error/CrashLoop pods)
+flux get kustomizations > /tmp/ks-before.txt
+kubectl get pods -A | grep -vE 'Running|Completed' > /tmp/pods-before.txt
+kubectl get clusters.postgresql.cnpg.io -A
 
-# fresh etcd snapshot (store OUTSIDE the repo; etcd-*.db is git-ignored)
-talosctl etcd snapshot ./etcd-pre-cilium-$(date +%Y%m%d-%H%M%S).db
+# etcd snapshot, stored OUTSIDE the repo
+mkdir -p ~/backups/etcd
+talosctl --nodes 192.168.1.154 etcd snapshot ~/backups/etcd/pre-cilium-$(date +%Y%m%d-%H%M%S).db
 
 # Velero backup completes
 velero backup create pre-cilium --wait
 velero backup get
 ```
 
-**NetworkPolicy warning — read carefully.** The following NetworkPolicies
-already exist and are currently **NOT enforced** (Flannel has no NetworkPolicy
-enforcement). Cilium enforces them the moment it starts managing endpoints:
+**NetworkPolicy warning.** `policyEnforcementMode` is `never` in
+`release.yaml`, so the existing NetworkPolicies are **NOT enforced** during and
+after the migration (Flannel never enforced them either). Do not flip it to
+`default` before the Phase 2 audit:
 
 ```bash
 kubectl get netpol -A
 ```
 
-| Namespace | NetworkPolicy | Selector |
+| Namespace | NetworkPolicy | Pod selector (live) |
 |---|---|---|
-| flux-system | allow-egress | (empty) |
-| flux-system | allow-scraping | (empty) |
-| flux-system | allow-webhooks | app=notification-controller |
-| payments | payments-platform | app.kubernetes.io/name=payments-platform |
-| payments | payments-platform-migrate | app.kubernetes.io/component=migration |
+| flux-system | allow-egress, allow-scraping | all pods |
+| flux-system | allow-webhooks | `app=notification-controller` |
+| payments | payments-platform | `app.kubernetes.io/instance=payments-platform,app.kubernetes.io/name=payments-platform` |
+| payments | payments-platform-migrate | `app.kubernetes.io/component=migration,app.kubernetes.io/instance=payments-platform,app.kubernetes.io/name=payments-platform-migration` |
 
-Review them before starting. If any denies a flow the workload needs, the pod
-will break after Cilium takes over. The policy baseline/audit is handled in a
-later phase; for this migration, the key check is that **Flux itself and
-payments keep working** after enforcement begins (watch `flux get kustomizations`
-and the payments pods). Note `policyEnforcementMode: default` means only pods
-*selected* by a policy are restricted — everything else stays open.
+**Payments caveat (broken as written).** `payments-platform` allows ingress to
+port 8000 only from pods in `envoy-gateway-system` labelled
+`app.kubernetes.io/name=envoy-gateway`. Read-only check of the real labels:
 
-## 2. Patch Talos machine configs (all 7 nodes)
+```bash
+kubectl -n envoy-gateway-system get pods --show-labels
+```
 
-Create the patch file:
+Result when this runbook was written: **no pod carries
+`app.kubernetes.io/name=envoy-gateway`**.
 
-```yaml
-# cilium-cni-patch.yaml
+- Envoy Gateway controller (`envoy-gateway-…`): `app.kubernetes.io/name=gateway-helm`,
+  `app.kubernetes.io/instance=envoy-gateway`, `control-plane=envoy-gateway`.
+- Envoy proxy pods (`envoy-envoy-gateway-system-<gateway>-…`, the ones that
+  actually forward traffic): `app.kubernetes.io/name=envoy`,
+  `app.kubernetes.io/component=proxy`, `app.kubernetes.io/managed-by=envoy-gateway`,
+  `gateway.envoyproxy.io/owning-gateway-name=<envoy-external|envoy-internal|envoy-nx|tcp-gateway>`.
+
+So enforcing that policy would block all ingress to payments. The Phase 2 audit
+must change its selector to the **proxy** pods (e.g. `app.kubernetes.io/name=envoy`
++ `gateway.envoyproxy.io/owning-gateway-name=envoy-internal`, since `papi` moves
+to the internal gateway) before `policyEnforcementMode` is set to `default`. The
+policy comes from the `payments-platform` Helm chart (0.2.4) values.
+
+## 2. Talos machine config patch (all 7 nodes, no reboot)
+
+```bash
+cat > /tmp/cilium-cni-patch.yaml <<'EOF'
 cluster:
   network:
     cni:
-      name: none      # stop bootstrapping Flannel
+      name: none      # stop rendering the Flannel bootstrap manifest
   proxy:
-    disabled: true    # stop bootstrapping kube-proxy
-```
+    disabled: true    # stop rendering the kube-proxy bootstrap manifest
+EOF
 
-Apply to **every node** with `--mode=no-reboot` (this does not reboot; it only
-updates the machine config):
+# sanity check on one node first
+talosctl patch mc --dry-run --patch @/tmp/cilium-cni-patch.yaml --nodes 192.168.1.154
 
-```bash
-# one at a time, or use the default node list the flake shellHook sets
 for ip in 192.168.1.145 192.168.1.176 192.168.1.154 \
           192.168.1.103 192.168.1.215 192.168.1.144 192.168.1.233; do
-  talosctl patch mc --mode=no-reboot --patch @cilium-cni-patch.yaml --nodes "$ip"
+  talosctl patch mc --mode=no-reboot --patch @/tmp/cilium-cni-patch.yaml --nodes "$ip"
 done
 
-# verify (optional): the patch is recorded, not yet applied to running state
-talosctl get mc -o json | grep -E '"name": "none"|"disabled": true'
+# verify: on control planes 05-flannel and 10-kube-proxy must be gone from the rendered manifests
+talosctl --nodes 192.168.1.154 get manifests
+talosctl --nodes 192.168.1.154 get mc -o yaml | grep -nE 'name: none|disabled: true'
 ```
 
-> **Important:** this patch only changes what Talos writes at *bootstrap time*.
-> The already-running `kube-flannel` and `kube-proxy` DaemonSets stay until you
-> delete them in step 4. It also does **not** apply the change to the running
-> node — the effective handover happens at the reboot in step 5.
->
-> **Local configs:** the per-node-type machine configs live in the git-ignored
-> `talos-infra/` directory (`controlplane.yaml`, `worker.yaml`, `workernvme.yaml`,
-> `workernvidia.yaml`, …). Add the same two keys there so a future
-> `talosctl apply-config` or re-provision does not reintroduce Flannel/kube-proxy.
+What this does: the patch is applied immediately, but it only changes the
+**bootstrap manifests Talos renders**. **Nothing that already runs is deleted**:
+the `kube-flannel` and `kube-proxy` DaemonSets, `flannel.1`, `cni0`, iptables
+rules and `/etc/cni/net.d/10-flannel.conflist` all stay. Talos v1.13+ only prunes
+rendered-away manifests when `talosctl upgrade-k8s` runs, so **do not run
+`upgrade-k8s` during the window**. Its job is done by the deletions in step 3.
+(After the migration a later `upgrade-k8s` finds nothing to prune.)
 
-## 3. Install Cilium via Flux
+Leftovers: `flannel.1`, `cni0` and the old iptables rules disappear at reboot.
+`/etc/cni` is **not** cleared by a reboot: on Talos it is an overlay persisted
+under `/var/system/overlays/etc-cni-diff`. Cilium (`cni.exclusive: true`) renames
+`10-flannel.conflist` to `10-flannel.conflist.cilium_bak` and writes
+`05-cilium.conflist`; both persist (harmless while Cilium is the CNI, relevant for
+rollback in §7).
 
-Cilium is fully GitOps-managed by this branch (`k8s/infrastructure/cilium/`):
+**Talos version note.** Both patch forms above are for Talos < v1.14 (all nodes
+here are 1.12.6 or 1.13.0). Talos ≥ v1.14 replaces them with
+`KubeFlannelCNIConfig` (`$patch: delete`) and `KubeProxyConfig`
+(`enabled: false`) documents (per
+<https://docs.siderolabs.com/kubernetes-guides/cni/deploying-cilium>).
 
-1. Merge the branch (or open the PR) so Flux syncs the new manifests.
-2. Confirm the HelmRepository, Kustomizations, and HelmRelease are healthy:
+**Local configs.** The git-ignored `talos-infra/` machine configs
+(`controlplane.yaml`, `worker.yaml`, `workernvme.yaml`, `workernvidia.yaml`,
+`controllaptop.yaml`, `controlmaster.yaml`) must get the same two keys by hand.
+Otherwise a later `talosctl apply-config` re-introduces Flannel/kube-proxy.
 
-```bash
-flux get sources helm -A | grep cilium
-flux get kustomizations
-flux get helmrelease -n kube-system cilium
-```
+## 3. Cutover (the window starts here)
 
-3. Wait for the Cilium DaemonSet and operator to be Ready:
+**Order and why.**
 
-```bash
-kubectl -n kube-system get ds cilium -o wide
-kubectl -n kube-system get deploy cilium-operator
-kubectl -n kube-system rollout status ds/cilium --timeout=10m
-```
-
-4. Confirm Cilium is running alongside (still) Flannel and kube-proxy:
-
-```bash
-kubectl -n kube-system get ds | grep -E 'cilium|flannel|proxy'
-kubectl -n kube-system exec ds/cilium -- cilium-dbg status
-```
-
-At this point Cilium is up but **not yet the active CNI** on every node — the
-nodes still run Flannel until you complete steps 4–5.
-
-## 4. Delete Flannel + kube-proxy (and leftovers)
-
-```bash
-# stop kube-proxy first (Cilium is already doing kube-proxy replacement)
-kubectl -n kube-system delete ds kube-proxy
-
-# then flannel
-kubectl -n kube-system delete ds kube-flannel
-
-# flannel leftovers (ConfigMap + RBAC)
-kubectl -n kube-system delete cm kube-flannel-cfg
-kubectl -n kube-system delete sa flannel
-kubectl delete clusterrole flannel
-kubectl delete clusterrolebinding flannel
-```
-
-> The `cilium-agent` pod writes its own CNI config (`/etc/cni/net.d/…`) and
-> removes the stale Flannel CNI config on each node. Until each node is rebooted
-> in step 5, some nodes may briefly be in a mixed state — this is the expected
-> short pod-network outage window. Pods that lose connectivity are rescheduled;
-> the reboot below makes the handover clean per-node.
-
-## 5. Rolling reboot — workers first, then control planes (one at a time)
-
-Do **not** reboot more than one node at a time. Keep etcd quorum (2 of 3
-control-plane nodes up) and keep the kube-vip VIP live at all times.
+1. `noout` first (Ceph must not rebalance while OSDs disappear).
+2. Un-suspend Cilium and wait for all agents Ready. Cilium is installed and
+   takes over each node's CNI config (`cni.exclusive`) while the old stack is
+   still there, so nodes that have not rebooted yet keep as much of their old
+   data path as possible (flanneld keeps its FDB, kube-proxy keeps syncing
+   endpoints). Flux and the Helm install need the pod network, so this is the
+   last moment they are reliable. Do not do anything else slow after it.
+3. Delete Flannel and kube-proxy **before the first reboot**. Otherwise the
+   DaemonSets start again on every rebooted node, rewrite the Flannel CNI config
+   and install kube-proxy iptables next to Cilium. Neither flanneld nor
+   kube-proxy is expected to clean up its links/rules when its pod stops, so
+   deleting the DaemonSets should not cause the outage by itself (leftovers go at
+   reboot; this was not tested on this cluster).
+4. Reboot all nodes one by one (§4): workers first, control planes last.
 
 ```bash
-# 1. Cordon Ceph from reboots so OSDs drain cleanly (workers host OSDs)
+# 1. Ceph: do not mark OSDs out while they are unreachable
 kubectl rook-ceph ceph osd set noout
-# (also fine to set nobackfill/norecover during the window, but noout is the key one)
 ```
 
-Reboot **workers** first, one at a time, verifying between each:
+```bash
+# 2. Cutover commit: suspend: false on cilium and cilium-routes (NOT flux resume)
+sed -i 's/^  suspend: true # GATED.*/  suspend: false # CUTOVER done, see MIGRATION.md/' \
+  k8s/infrastructure/cilium/ks.yaml k8s/infrastructure/cilium/routes-ks.yaml
+git diff --stat
+git commit -am "feat(cilium): cutover, un-suspend cilium Kustomizations"
+# merge to main (PR), then:
+flux reconcile source git flux-system
+flux reconcile kustomization flux-system
+flux reconcile kustomization cilium
+
+kubectl -n kube-system rollout status ds/cilium --timeout=10m
+kubectl -n kube-system rollout status deploy/cilium-operator --timeout=10m
+kubectl -n kube-system get pods -l k8s-app=cilium -o wide        # 7 pods Running, one per node
+kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium-dbg status | grep -E 'KubeProxyReplacement|Cluster health'
+```
+
+If `flux get hr -n kube-system cilium` shows a failed release, **do not uninstall
+or roll back** (remediation is disabled on purpose, `retries: 0`).
+Read `kubectl -n kube-system describe hr cilium`, fix the cause, and after the window
+force a retry with `flux reconcile helmrelease cilium -n kube-system --force`.
+The Hubble relay/UI pods may only become Ready after reboots; that is the
+usual reason for a timed-out release during the window.
 
 ```bash
-# worker order (workers only)
-for ip in 192.168.1.103 192.168.1.215 192.168.1.144 192.168.1.233; do
-  echo "== rebooting worker $ip =="
-  talosctl reboot --nodes "$ip" --wait
-  kubectl wait --for=condition=Ready node/$(kubectl get nodes -o jsonpath="{.items[?(@.status.addresses[?(@.address=='$ip')].address)].metadata.name}") --timeout=300s
-  kubectl -n kube-system exec ds/cilium -- cilium-dbg status | grep -E 'Node|Healthy|Containers|KubeProxy'
-  # spot-check cross-node connectivity before the next node
-  kubectl get pods -A -o wide | grep -v Running || true
+# 3. Remove Flannel + kube-proxy: exactly what Talos rendered (see `talosctl get manifests` before the patch)
+kubectl -n kube-system delete ds kube-proxy kube-flannel
+kubectl -n kube-system delete sa kube-proxy flannel
+kubectl -n kube-system delete cm kube-flannel-cfg
+kubectl delete clusterrolebinding kube-proxy flannel
+kubectl delete clusterrole flannel
+```
+
+Never delete `kube-vip-ds` or the `metallb` speaker DaemonSet.
+
+## 4. Rolling reboot with gates (workers first, then control planes)
+
+Never reboot two nodes at once. Paste the helpers once:
+
+```bash
+WORKERS="192.168.1.103 192.168.1.215 192.168.1.144 192.168.1.233"
+
+# node name for an InternalIP
+node_name() {
+  kubectl get node -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' \
+    | awk -v ip="$1" '$2==ip{print $1}'
+}
+
+# after a reboot: kubelet Ready, Cilium agent Ready on that node, KPR on
+wait_node() {
+  local n; n=$(node_name "$1")
+  kubectl wait --for=condition=Ready "node/$n" --timeout=600s
+  kubectl -n kube-system wait --for=condition=Ready pod -l k8s-app=cilium \
+    --field-selector "spec.nodeName=$n" --timeout=600s
+  kubectl -n kube-system exec "$(kubectl -n kube-system get pod -l k8s-app=cilium \
+    --field-selector "spec.nodeName=$n" -o name)" -c cilium-agent -- \
+    cilium-dbg status | grep -E 'KubeProxyReplacement|Cluster health'
+}
+
+# control-plane gate: etcd 3 healthy members, kube-vip healthy, VIP answers
+cp_gate() {
+  talosctl --nodes 192.168.1.145,192.168.1.176,192.168.1.154 etcd status
+  kubectl -n kube-system get ds kube-vip-ds
+  kubectl --server https://192.168.1.100:6443 get --raw /readyz; echo
+}
+```
+
+**Workers.** Gate before the **first** worker (strict baseline; stop if it fails):
+
+```bash
+kubectl rook-ceph ceph status   # HEALTH_OK except the noout warning, all PGs active+clean, mon quorum 3/3
+```
+
+Between later workers Ceph is **expected to be degraded** (the rebooted workers'
+OSDs sit on the Cilium island, the mons may still be on the Flannel island), so
+`ceph status` can hang or show down OSDs and inactive PGs. That is not a reason
+to stop. The gate for each following worker is: the previous node passed
+`wait_node`, and its pods are Running (`kubectl get pods -A -o wide | grep <node>`).
+Never run `osd out`, `osd purge` or `osd unset noout` in the window.
+
+```bash
+for ip in $WORKERS; do
+  echo "== rebooting worker $ip ($(node_name $ip)) =="
+  talosctl reboot --nodes "$ip"      # waits until the node is back
+  wait_node "$ip" || break           # stop on the first failure, investigate
 done
 ```
 
-Then reboot **control planes**, one at a time, keeping quorum:
+**Control planes.** Reboot the current kube-vip holder **last** (it holds
+`plndr-cp-lock`; rebooting it forces a VIP failover). kube-vip reaches the API
+through the `10.96.0.1` ClusterIP, which now depends on Cilium instead of
+kube-proxy, so `cp_gate` also verifies kube-vip after each reboot. Before **each**
+control-plane reboot `cp_gate` must show: 3 etcd members without errors,
+`kube-vip-ds` 3/3 ready, and the VIP answering `ok`.
 
 ```bash
-# control-plane order (2 members stay up while 1 reboots)
-for ip in 192.168.1.154 192.168.1.176 192.168.1.145; do
-  echo "== rebooting control-plane $ip =="
-  talosctl reboot --nodes "$ip" --wait
-  kubectl wait --for=condition=Ready node/$(kubectl get nodes -o jsonpath="{.items[?(@.status.addresses[?(@.address=='$ip')].address)].metadata.name}") --timeout=300s
-  # etcd quorum + API through VIP must stay healthy
-  talosctl get members
-  kubectl get --raw /readyz && echo API-OK
+HOLDER=$(kubectl -n kube-system get lease plndr-cp-lock -o jsonpath='{.spec.holderIdentity}'); echo "VIP holder: $HOLDER"
+# default order: 1i8-qm9 (.145), 47z-ayo (.176), then the holder talos-cp-03 (.154)
+# if the holder is NOT talos-cp-03, put the holder's IP last.
+for ip in 192.168.1.145 192.168.1.176 192.168.1.154; do
+  echo "== control-plane $ip ($(node_name $ip)): gate =="
+  cp_gate || break
+  talosctl reboot --nodes "$ip"
+  wait_node "$ip" || break
+  cp_gate || break                   # etcd back to 3 healthy, kube-vip 3/3, VIP ok
 done
-
-# 2. Re-enable Ceph backfill once every node is done
-kubectl rook-ceph ceph osd unset noout
 ```
 
-**Verification during the window:**
+If etcd shows fewer than 3 healthy members after a control-plane reboot, wait for
+it to rejoin (`talosctl etcd members`); do not reboot the next control plane.
+
+## 5. Post-checks
 
 ```bash
-kubectl -n kube-system exec ds/cilium -- cilium-dbg status
-# expect: all nodes listed, KubeProxyReplacement=Strict/True, no "no cni" errors
-kubectl get nodes -o wide   # all Ready
-kubectl get pods -A | grep -v Running   # nothing stuck CrashLoop/ContainerCreating
-```
-
-## 6. Post-checks
-
-```bash
-# Cilium healthy on every node, kube-proxy replacement active
-kubectl -n kube-system exec ds/cilium -- cilium-dbg status
-
-# no flannel/kube-proxy left anywhere
-kubectl get ds -A | grep -E 'flannel|proxy' || echo "clean"
+# Cilium healthy on every node, KPR active, no flannel/kube-proxy left
+kubectl -n kube-system get pods -l k8s-app=cilium -o wide
+kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium-dbg status | grep -E 'KubeProxyReplacement|Cluster health|Controller Status'
+kubectl get ds -A | grep -E 'flannel|kube-proxy' || echo clean
+kubectl get nodes -o wide
 
 # control plane + VIP
-kubectl get --raw /readyz && echo API-OK
-kubectl get svc kubernetes   # ClusterIP 10.96.0.1 reachable
+kubectl --server https://192.168.1.100:6443 get --raw /readyz; echo
+kubectl get svc kubernetes                      # ClusterIP 10.96.0.1
+kubectl -n kube-system get ds kube-vip-ds
 
-# Envoy Gateway + MetalLB VIPs still reachable (192.168.1.69/.70/.71/.72)
-kubectl -n envoy-gateway-system get pods
-kubectl -n envoy-gateway-system get svc envoy-envoy-gateway-class -o jsonpath='{.status.loadBalancer.ingress}'; echo
-curl -sk https://hubble.internal.grendel71.net/ | head -c 200; echo
+# CoreDNS resolution: cluster names and external names (host DNS forwarding + hostLegacyRouting)
+kubectl -n kube-system get pods -l k8s-app=kube-dns -o wide
+kubectl run dnscheck --rm -i --restart=Never --image=busybox:1.37 -- \
+  sh -c 'nslookup kubernetes.default.svc.cluster.local && nslookup example.com'
 
-# DNS (CoreDNS must resolve inside the cluster)
-kubectl -n kube-system get pods | grep coredns
-kubectl run dnscheck --rm -it --restart=Never --image=busybox -- nslookup kubernetes.default
+# Envoy Gateway services are named envoy-<ns>-<gateway>-<hash>: read them, do not guess
+kubectl -n envoy-gateway-system get svc
+kubectl -n envoy-gateway-system get svc -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.name}{" "}{.status.loadBalancer.ingress[0].ip}{"\n"}{end}'
+# expected (verified live when this runbook was written): envoy-external .67, envoy-internal .69,
+# envoy-nx .71, tcp-gateway .72
+kubectl get gateway -A                          # all PROGRAMMED True
 
-# Ceph + CNPG
-kubectl rook-ceph ceph status
-kubectl get clusters.postgresql.cnpg.io -A   # or per-app CNPG clusters Ready
+# MetalLB VIPs reachable and served by Envoy (any HTTP status = OK; 000 / timeout = broken)
+curl -sk -o /dev/null -w '%{http_code}\n' --resolve me.grendel71.net:443:192.168.1.67 https://me.grendel71.net/
+curl -sk -o /dev/null -w '%{http_code}\n' --resolve open-webui.internal.grendel71.net:443:192.168.1.69 https://open-webui.internal.grendel71.net/
+curl -sk -o /dev/null -w '%{http_code}\n' --resolve st.x.nx8192.win:443:192.168.1.71 https://st.x.nx8192.win/
+timeout 5 bash -c '</dev/tcp/192.168.1.72/8088' && echo tcp-gateway-open
+# Hubble UI, internal only
+curl -sk -o /dev/null -w '%{http_code}\n' --resolve hubble.internal.grendel71.net:443:192.168.1.69 https://hubble.internal.grendel71.net/
 
-# Hubble UI is served through envoy-internal (not public)
-curl -sk https://hubble.internal.grendel71.net/ | head -c 200; echo
+# Ceph: full recovery BEFORE removing noout
+kubectl rook-ceph ceph status                   # HEALTH_OK except noout, PGs active+clean, mon quorum 3/3
+kubectl rook-ceph ceph osd tree
+kubectl rook-ceph ceph osd unset noout          # re-enables marking down OSDs "out" (not backfill)
+kubectl rook-ceph ceph status                   # HEALTH_OK
 
-# optional: full connectivity test (needs cilium CLI; note Talos PodSecurity
-# may require `--force-deploy` or a privileged namespace label for the test pods)
+# CNPG clusters healthy
+kubectl get clusters.postgresql.cnpg.io -A
+
+# Flux: every Kustomization Ready (compare with the baseline)
+flux get kustomizations > /tmp/ks-after.txt; diff /tmp/ks-before.txt /tmp/ks-after.txt
+flux get kustomizations | grep -v True || echo "all Ready"
+flux get helmreleases -A | grep -v True || echo "all Ready"
+kubectl get pods -A | grep -vE 'Running|Completed' | diff /tmp/pods-before.txt - || true
+
+# optional: needs the cilium CLI and a privileged test namespace (Talos PodSecurity)
 # cilium connectivity test
 ```
 
-## 7. Rollback (if Cilium must be removed before cutover is complete)
+## 6. After success: follow-up commit
 
-**Before deleting Flannel (steps 4–5):** rollback is a pure Flux operation —
-revert/merge the branch removal and `flux reconcile kustomization flux-system`;
-Flannel + kube-proxy were never touched and remain active.
+A **separate** commit after §5 passes:
 
-**After Flannel is deleted but before the reboot completes:**
+- Delete the `operator.unmanagedPodWatcher` block from `app/release.yaml`
+  (restores the default `restart: true`: the operator restarts pods that are not
+  managed by Cilium).
+- Leave `bpf.hostLegacyRouting: true` and `policyEnforcementMode: never`
+  untouched here. `policyEnforcementMode` becomes `default` **only in the Phase 2
+  commit**, together with the audited/verified policies (including the payments
+  selector fix from §1).
+
+## 7. Rollback
+
+**Never run `talosctl bootstrap`.** It initialises etcd and is dangerous on a live
+cluster; it is not a way to bring back Flannel.
+
+- **Before the cutover commit:** nothing to roll back. The Kustomizations are
+  suspended, nothing is installed. Revert the gate PR if wanted.
+- **After the cutover commit:** pods that have already moved to Cilium stay
+  there. Going back to Flannel after nodes have rebooted onto Cilium is a
+  **second maintenance window**.
+
+Steps:
 
 ```bash
-# re-apply the Talos bootstrap CNI/proxy (reverts the step-2 patch)
-#   cluster.network.cni.name: flannel   cluster.proxy.disabled: false
-# re-create flannel + kube-proxy by re-running bootstrap on a control-plane:
-talosctl bootstrap --nodes 192.168.1.145   # re-applies bootstrap manifests
-# then revert the Flux change and reconcile
+# 1. Revert the Talos patch on all 7 nodes (Flannel + kube-proxy rendered again)
+cat > /tmp/flannel-restore-patch.yaml <<'EOF'
+cluster:
+  network:
+    cni:
+      name: flannel
+  proxy:
+    disabled: false
+EOF
+for ip in 192.168.1.145 192.168.1.176 192.168.1.154 \
+          192.168.1.103 192.168.1.215 192.168.1.144 192.168.1.233; do
+  talosctl patch mc --mode=no-reboot --patch @/tmp/flannel-restore-patch.yaml --nodes "$ip"
+done
+talosctl --nodes 192.168.1.154 get manifests        # 05-flannel and 10-kube-proxy are back
 ```
 
-**After full cutover (post step 5):** rolling back means re-introducing
-Flannel+kube-proxy. Reverse steps: revert the Talos patch (cni back to `flannel`,
-`proxy.disabled: false`), `talosctl bootstrap`, delete the Cilium HelmRelease via
-Flux (remove the Kustomization), then rolling-reboot again. Pod IPs stay the same
-(ipam.mode was `kubernetes`), so workloads keep their addresses.
+```bash
+# 2. Make Cilium clean up its CNI config when it goes away.
+#    Git commit 1: set `cni.uninstall: true` in app/release.yaml, reconcile, wait for the agent rollout.
+#    Git commit 2: remove `cilium/ks.yaml` and `cilium/routes-ks.yaml` from
+#    k8s/infrastructure/kustomization.yaml.
+#    `prune: true` on the cilium Kustomization means removing it UNINSTALLS the CNI
+#    (helm uninstall). With cni.uninstall false that would leave 05-cilium.conflist
+#    on every node and break pod creation; with true the agent's preStop hook
+#    removes it.
+flux reconcile source git flux-system
+flux reconcile kustomization flux-system
+kubectl -n kube-system get ds cilium                 # gone
 
-## 8. Follow-ups (separate PRs)
+# check every node: only 10-flannel.conflist may remain, no 05-cilium.conflist
+for ip in 192.168.1.145 192.168.1.176 192.168.1.154 \
+          192.168.1.103 192.168.1.215 192.168.1.144 192.168.1.233; do
+  talosctl --nodes "$ip" list /etc/cni/net.d
+done
+```
 
-- **WireGuard encryption** — set `encryption.enabled: true`,
+If `05-cilium.conflist` or `*.cilium_bak` files are still there they must be
+removed by hand: **a reboot does not clear them** (`/etc/cni` is a persistent
+overlay on Talos) and `05-` sorts before `10-flannel.conflist`, so it would win.
+`talosctl` has no `rm`; use a privileged hostNetwork pod with a `hostPath` mount of
+`/etc/cni/net.d`, and rename any `*.cilium_bak` back.
+
+```bash
+# 3. Bring the Talos-rendered manifests (Flannel DaemonSet, kube-proxy) back.
+#    `talosctl upgrade-k8s` re-applies the bootstrap manifests (server-side apply
+#    with inventory); using the CURRENT Kubernetes version makes it a manifest sync.
+talosctl --nodes 192.168.1.154 upgrade-k8s --to 1.35.2 --dry-run
+talosctl --nodes 192.168.1.154 upgrade-k8s --to 1.35.2
+kubectl -n kube-system get ds kube-flannel kube-proxy
+```
+
+```bash
+# 4. Rolling reboot of all nodes again with the §4 gates, so every pod gets a Flannel IP.
+#    Afterwards: git, re-gate the Kustomizations (suspend: true) if Cilium is re-added.
+```
+
+## 8. Follow-ups (separate commits/PRs)
+
+- **WireGuard encryption:** set `encryption.enabled: true`,
   `encryption.type: wireguard`, `encryption.nodeEncryption: true` in
-  `release.yaml` (commented placeholder is already in the values).
-- **Talos version convergence** — bring `talos-1i8-qm9` and `talos-i4x-2pd` from
-  `v1.12.6` up to `v1.13.0` so all nodes match, then consider v1.14+ (which
-  changes the CNI/proxy patch format — update this runbook when you do).
-- **NetworkPolicy hardening (Phase 2)** — the `cilium-policies` +
-  per-namespace policies for `payments`, `authentik`, `leaderboard`, `lifter`,
-  and the `jellyfin`/`website` pods in `apps` (see plan tasks 3–4).
+  `release.yaml` (commented placeholder already there).
+- **Talos version convergence:** bring `talos-1i8-qm9` and `talos-i4x-2pd` from
+  `v1.12.6` to `v1.13.0`. For Talos ≥ v1.14 the CNI/proxy settings move to the
+  `KubeFlannelCNIConfig` / `KubeProxyConfig` documents (see §2); update this
+  runbook then.
+- **Phase 2, NetworkPolicy hardening:** audit the existing policies, fix the
+  payments ingress selector (§1), add policies for `authentik`, `leaderboard`,
+  `lifter`, `payments` and the `apps` namespace, a `cilium-policies` Kustomization
+  that `dependsOn: cilium`, then set `policyEnforcementMode: default`.
+- Re-evaluate `bpf.hostLegacyRouting` only if Talos `forwardKubeDNSToHost` is
+  turned off.
