@@ -10,8 +10,10 @@
 #
 # ############################################################################
 # GATED. Do not flip `suspend` to false until the MIGRATION.md cutover step.
-# Cutover = a git commit setting `suspend: false` (`flux resume` alone is
-# reverted by the parent `flux-system` Kustomization, which re-applies this file).
+# Cutover = a git commit setting `suspend: false`, merged to main.
+# NEVER use `flux resume` for this Kustomization: a resumed Kustomization
+# reconciles at once and installs its content immediately (the parent
+# `flux-system` Kustomization only reverts the flag at its next reconcile).
 # ############################################################################
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

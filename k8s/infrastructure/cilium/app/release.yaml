@@ -27,6 +27,13 @@ spec:
   # network out from under every node. A failed release must be fixed by a human
   # (see MIGRATION.md), never auto-remediated.
   install:
+    # CUTOVER ONLY. Do not make the Helm install wait for every workload: during
+    # the maintenance window the pod network is split in two islands, so Hubble
+    # relay/UI (and the hubble cert Job) may not be Ready for a long time, and a
+    # Helm wait timeout would mark the release failed. MIGRATION.md gates on
+    # `rollout status` of the cilium DaemonSet and operator instead. Restoring
+    # the default (delete this line) after the migration is optional (§6).
+    disableWait: true
     remediation:
       retries: 0
   upgrade:
@@ -52,11 +59,15 @@ spec:
     tunnelProtocol: vxlan
 
     # --- Host routing / masquerade ----------------------------------------
-    # Talos forwards kube-dns to the host DNS cache (`forwardKubeDNSToHost`,
-    # enabled on this cluster). That does not work with Cilium's eBPF
-    # host-routing, so legacy host routing is REQUIRED (Cilium Talos install guide).
-    # Masquerading stays on iptables (chart default); bpf.masquerade=true is a
-    # documented Talos problem together with forwardKubeDNSToHost.
+    # hostLegacyRouting: true comes from the Cilium migration guide
+    # (k8s-install-migration, values-migration.yaml: "Allow for routing between
+    # Cilium and the existing overlay"). It is needed while Flannel pods and
+    # Cilium pods coexist. It is harmless to keep after the migration (it only
+    # forgoes the optional eBPF host-routing speed-up), so MIGRATION.md §6 leaves it.
+    # NOT a Talos requirement: the Cilium-on-Talos guide's Known issues only
+    # list "forwardKubeDNSToHost + bpf.masquerade=true" (CoreDNS breaks). That is
+    # avoided by keeping masquerading on iptables (chart default, bpf.masquerade
+    # false below), independent of hostLegacyRouting.
     bpf:
       hostLegacyRouting: true
       masquerade: false

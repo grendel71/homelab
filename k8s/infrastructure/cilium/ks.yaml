@@ -8,11 +8,16 @@
 #
 # ############################################################################
 # GATED. Do not flip `suspend` to false until the MIGRATION.md cutover step.
-# Cutover = a git commit setting `suspend: false` (`flux resume` alone is
-# reverted by the parent `flux-system` Kustomization, which re-applies this file).
+# Cutover = a git commit setting `suspend: false`, merged to main.
+# NEVER use `flux resume` for this Kustomization: a resumed Kustomization
+# reconciles at once and INSTALLS Cilium immediately, outside the runbook order
+# (the parent `flux-system` Kustomization would only revert the flag at its next
+# reconcile, too late). Likewise never `flux suspend/resume` it to "retry".
 # While suspended: nothing is installed, nothing is pruned, and every Kustomization
-# that `dependsOn: cilium` (e.g. `cilium-routes`, future cilium-policies) stays
-# blocked because this Kustomization never reports Ready.
+# that `dependsOn: cilium` (`cilium-routes`, `cilium-policies`) stays
+# blocked because this Kustomization never reports Ready. Note that
+# `cilium-policies` is gated ONLY by that `dependsOn: cilium`: removing the
+# dependency from its ks.yaml un-gates it (see MIGRATION.md).
 # ############################################################################
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
