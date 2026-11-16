@@ -41,8 +41,8 @@ Flux, CNPG, Ceph clients and Envoy Gateway to be disrupted.**
 are down for the whole window: §2b suspends the `authentik` Kustomization and
 hibernates `authentik-db` (CNPG), so everything that logs in through Authentik
 cannot authenticate. The other consumers in the §2b table go down too (Immich,
-Nextcloud, Vaultwarden, LiteLLM, Open WebUI, Jellyfin, the *arr stack, the mautrix
-bridges, the payments DB and so on). Schedule accordingly and warn users.
+Nextcloud, Vaultwarden, LiteLLM, Open WebUI, Jellyfin, the *arr stack, the payments
+DB and so on). Schedule accordingly and warn users.
 
 Why: Flannel and Cilium would both own `10.244.0.0/16` (`ipam.mode: kubernetes`
 reuses the node podCIDRs) and cannot interoperate. Flannel's overlay is VXLAN on
@@ -298,7 +298,6 @@ list and the Helm release labels; re-derive with those commands, the list drifts
 | Namespace | Workload (RBD) | Flux owner (Kustomization → HelmRelease) |
 |---|---|---|
 | apps | CNPG `example-pg` | `example-db` |
-| apps | CNPG `mautrix-instagram-db` / `mautrix-meta-db` / `mautrix-whatsapp-db` | `mautrix-instagram` / `mautrix-meta` / `mautrix-whatsapp` |
 | authentik | CNPG `authentik-db` | `authentik` |
 | immich | CNPG `immich-postgres` | `immich` |
 | leaderboard | CNPG `leaderboard-db` | `leaderboard` |
@@ -308,7 +307,7 @@ list and the Helm release labels; re-derive with those commands, the list drifts
 | pappwiki | CNPG `pappwiki-db` | `pappwiki` |
 | payments | CNPG `payments-db` | `payments` |
 | ai | deploy `hermes` | `hermes-agent` → HR `hermes` |
-| apps | deploy `firefox`, `jellyfin`, `searxng`, `searxng-valkey`, `syncthing`, `tuwunel`, `open-webui-pipelines`; sts `open-webui` | `firefox`, `jellyfin`, `searxng`, `syncthing`, `tuwunel`, `open-webui` (HR of the same names) |
+| apps | deploy `firefox`, `jellyfin`, `searxng`, `searxng-valkey`, `syncthing`, `open-webui-pipelines`; sts `open-webui` | `firefox`, `jellyfin`, `searxng`, `syncthing`, `open-webui` (HR of the same names) |
 | torrent | deploy `prowlarr`, `radarr`, `sonarr`, `qbittorrent` | `arr` (HR `prowlarr`/`radarr`/`sonarr`), `qbittorrent` |
 | vaultwarden | sts `vaultwarden`; `bw-portal-redis` (Redis CR, sts) | `vaultwarden` → HR `vaultwarden`, `bw-portal-redis` |
 
@@ -319,10 +318,10 @@ CNPG operator (`cnpg-system`) must keep running: it performs the hibernation.
 
 ```bash
 # 1. Suspend the Flux owners (NEVER cilium / cilium-routes here)
-KS_SUSPEND=(example-db mautrix-instagram mautrix-meta mautrix-whatsapp authentik immich leaderboard
+KS_SUSPEND=(example-db authentik immich leaderboard
             lifter litellm nextcloud pappwiki payments hermes-agent firefox jellyfin searxng syncthing
-            tuwunel open-webui arr qbittorrent vaultwarden)
-HR_SUSPEND=(ai/hermes apps/firefox apps/jellyfin apps/searxng apps/syncthing apps/tuwunel apps/open-webui
+            open-webui arr qbittorrent vaultwarden)
+HR_SUSPEND=(ai/hermes apps/firefox apps/jellyfin apps/searxng apps/syncthing apps/open-webui
             litellm/litellm litellm/litellm-redis nextcloud-new/nextcloud torrent/prowlarr torrent/radarr
             torrent/sonarr torrent/qbittorrent vaultwarden/vaultwarden vaultwarden/bw-portal-redis
             flux-system/redis-operator)
@@ -334,7 +333,7 @@ for hr in "${HR_SUSPEND[@]}"; do flux suspend helmrelease "${hr#*/}" -n "${hr%%/
 # 2. Record replicas, then hibernate CNPG and scale the consumers to zero
 WIN=$(mktemp -d)                         # also used by §2b access setup below; keep this shell
 WORKLOADS=(ai/deploy/hermes apps/deploy/firefox apps/deploy/jellyfin apps/deploy/searxng
-           apps/deploy/searxng-valkey apps/deploy/syncthing apps/deploy/tuwunel
+           apps/deploy/searxng-valkey apps/deploy/syncthing
            apps/deploy/open-webui-pipelines apps/statefulset/open-webui
            nextcloud-new/deploy/nextcloud torrent/deploy/prowlarr torrent/deploy/radarr
            torrent/deploy/sonarr torrent/deploy/qbittorrent vaultwarden/statefulset/vaultwarden
