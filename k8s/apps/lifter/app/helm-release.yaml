@@ -1,4 +1,3 @@
----
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -60,7 +59,7 @@ spec:
             image:
               repository: bhcr8192.duckdns.org/lifter-web
               # Flux image automation sets this to the newest epoch tag.
-              tag: "latest" # {"$imagepolicy": "lifter:lifter-web-policy:tag"}
+              tag: "1794803174" # {"$imagepolicy": "lifter:lifter-web-policy:tag"}
             ports:
               - name: http
                 containerPort: 80
