@@ -8,7 +8,7 @@ spec:
   chart:
     spec:
       chart: velero
-      version: ">=7.0.0"
+      version: "12.2.5"
       sourceRef:
         kind: HelmRepository
         name: velero-chart
@@ -17,6 +17,9 @@ spec:
   install:
     createNamespace: true
   values:
+    image:
+      repository: docker.io/velero/velero
+      tag: v1.19.0-rc.1
     configuration:
       defaultVolumesToFsBackup: true
       backupStorageLocation:
@@ -27,6 +30,7 @@ spec:
             region: default
             s3ForcePathStyle: "true"
             s3Url: http://192.168.1.231:30304
+            checksumAlgorithm: ""
       volumeSnapshotLocation:
         - name: default
           provider: aws
@@ -41,7 +45,7 @@ spec:
 
     initContainers:
       - name: velero-plugin-for-aws
-        image: velero/velero-plugin-for-aws:v1.10.0
+        image: velero/velero-plugin-for-aws:v1.15.0-rc.1
         imagePullPolicy: IfNotPresent
         volumeMounts:
           - mountPath: /target
