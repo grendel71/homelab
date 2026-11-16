@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: lifter-db
+  namespace: lifter
+spec:
+  instances: 1
+  bootstrap:
+    initdb:
+      database: lifter
+      owner: lifter
+      secret:
+        name: lifter-db-secret
+  storage:
+    size: 2Gi
+    storageClass: replicated-x3-block-store
