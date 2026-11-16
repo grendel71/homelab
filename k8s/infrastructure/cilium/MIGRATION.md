@@ -12,8 +12,14 @@
 (kube-proxy replacement + Hubble), managed by Flux.
 
 **State in git:** the `cilium` and `cilium-routes` Flux Kustomizations are
-**GATED** (`suspend: true`). Merging the gated manifests to `main` installs
-nothing. The cutover is a separate commit that sets `suspend: false` (§3).
+**GATED** (`suspend: true`). Merging to `main` does **not** install Cilium, but it
+is not a no-op. It (1) changes the `payments` HTTPRoute (moved to `envoy-internal`,
+host `papi.internal.grendel71.net`, applied at the next reconcile of `payments`),
+(2) adds the `cilium` HelmRepository (to `sources`, see §0), (3) adds the
+suspended `cilium` and `cilium-routes` Kustomizations, and (4) adds
+`cilium-policies`, which stays Ready=False ("dependency not ready", retried every
+2m) until the cutover. Nothing else. The cutover is a separate commit that sets
+`suspend: false` (§3).
 **NEVER use `flux resume` for `cilium` or `cilium-routes`:** a resumed
 Kustomization reconciles immediately and installs Cilium outside the runbook
 order; the parent `flux-system` Kustomization only reverts the flag at its next
@@ -30,6 +36,13 @@ while `policyEnforcementMode: never`.
 moment the first Cilium agent starts and the last node reboot (about 30–60 min).
 Existing pods keep running on their old IPs until their node reboots. Expect
 Flux, CNPG, Ceph clients and Envoy Gateway to be disrupted.**
+
+**This window takes SSO offline.** Authentik (`ak.grendel71.net`) and its database
+are down for the whole window: §2b suspends the `authentik` Kustomization and
+hibernates `authentik-db` (CNPG), so everything that logs in through Authentik
+cannot authenticate. The other consumers in the §2b table go down too (Immich,
+Nextcloud, Vaultwarden, LiteLLM, Open WebUI, Jellyfin, the *arr stack, the mautrix
+bridges, the payments DB and so on). Schedule accordingly and warn users.
 
 Why: Flannel and Cilium would both own `10.244.0.0/16` (`ipam.mode: kubernetes`
 reuses the node podCIDRs) and cannot interoperate. Flannel's overlay is VXLAN on
@@ -80,12 +93,17 @@ goes through a cross-node ClusterIP service:
   (`kubectl top` and discovery warnings are expected). **Create no PVCs, no CNPG
   changes and no runner pods in the window.**
 
+**Helm source risk.** The `sources` Kustomization (`wait: true`) now includes the
+`cilium` HelmRepository: if `helm.cilium.io` is unreachable, `sources` and every
+Kustomization that depends on it become not Ready. Check `flux get sources helm -A`
+before the window.
+
 Pods get **new IPs** when their node reboots.
 
 Consequences for the procedure:
 
 - Do everything that needs a working Flux/pod network **before** the first Cilium
-  agent starts (merge, reconcile, Hubble certs, hibernation).
+  agent starts (merge, reconcile, hibernation).
 - Do not "wait for green" mid-window on anything that crosses the pod network.
   The strict Ceph gates apply **before the first reboot** and again in §5
   **before `osd unset noout`**.
@@ -202,7 +220,9 @@ are **untested**:
    same per-node /24? (e) do the helper greps match the real `cilium-dbg status
    --verbose` output of 1.20.4 (`KubeProxyReplacement: True`, `Socket LB: Enabled`,
    `Cluster health: N/N reachable`)? (f) the §7 rollback incl. the host-local
-   cleanup.
+   cleanup. (g) Does `Cluster health` reach N/N on a rebooted node while the
+   other nodes are still on Flannel? (`wait_node` treats it as a soft check
+   because this is unproven.)
 4. Fix this document with whatever differs, then schedule the real window.
 
 ## 2. Talos machine config patch (all 7 nodes, no reboot)
@@ -372,6 +392,9 @@ install -m 600 "$TALOSCONFIG" "$WIN/talosconfig"
 export KUBECONFIG="$WIN/kubeconfig" TALOSCONFIG="$WIN/talosconfig"
 
 # use_cp ip [ip...]: kubectl -> the first ip, talosctl -> all ips (never the VIP)
+# WARNING: in a direnv shell, leaving and re-entering the repo directory can reset the exported
+# KUBECONFIG/TALOSCONFIG to the originals. Re-export the copies first
+# (export KUBECONFIG="$WIN/kubeconfig" TALOSCONFIG="$WIN/talosconfig"), then re-run use_cp.
 use_cp() {
   local cl
   cl=$(kubectl config view --minify -o jsonpath='{.clusters[0].name}') || return 1
@@ -388,7 +411,7 @@ confirm() { local a; read -r -p "$1 [y/N] " a; [[ $a == [yY]* ]]; }
 # node name for an InternalIP (fails if there is none)
 node_name() {
   local n
-  n=$(kubectl get node -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' \
+  n=$(timeout 30 kubectl get node -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' \
       | awk -v ip="$1" '$2==ip{print $1}')
   [[ -n $n ]] || { echo "FAIL: no node with InternalIP $1" >&2; return 1; }
   echo "$n"
@@ -450,9 +473,9 @@ kubectl wait --for=condition=Ready pod/netcheck-a pod/netcheck-b --timeout=180s
 A_IP=$(kubectl get pod netcheck-a -o jsonpath='{.status.podIP}'); B_IP=$(kubectl get pod netcheck-b -o jsonpath='{.status.podIP}')
 echo "A=$A_IP B=$B_IP"
 probe() {
-  kubectl exec netcheck-a -- ping -c 3 -W 2 "$B_IP" &&
-  kubectl exec netcheck-b -- ping -c 3 -W 2 "$A_IP" &&
-  kubectl exec netcheck-a -- timeout 8 nslookup kubernetes.default.svc.cluster.local
+  timeout 30 kubectl exec netcheck-a -- ping -c 3 -W 2 "$B_IP" &&
+  timeout 30 kubectl exec netcheck-b -- ping -c 3 -W 2 "$A_IP" &&
+  timeout 30 kubectl exec netcheck-a -- timeout 8 nslookup kubernetes.default.svc.cluster.local
 }
 probe && echo "PROBE BASELINE OK"            # must pass before going on
 
@@ -476,7 +499,7 @@ flux reconcile kustomization cilium
 kubectl -n kube-system rollout status ds/cilium --timeout=10m
 kubectl -n kube-system rollout status deploy/cilium-operator --timeout=10m
 kubectl -n kube-system get pods -l k8s-app=cilium -o wide        # 7 pods Running, one per node
-kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium-dbg status --verbose | grep -E 'KubeProxyReplacement|Socket LB|Cluster health'
+timeout 30 kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium-dbg status --verbose | grep -E 'KubeProxyReplacement|Socket LB|Cluster health'
 ```
 
 The HelmRelease has `install.disableWait: true` for the cutover, so it does not
@@ -531,36 +554,50 @@ Never reboot two nodes at once. Paste the helpers once (they use the arrays,
 
 ```bash
 # after a reboot: a NEW boot (bootID changed, so stale Ready/stale pod state cannot pass),
-# node Ready, then strict Cilium checks on that node's agent.
+# node Ready, then Cilium checks on that node's agent. KPR True and Socket LB Enabled are
+# HARD checks. "Cluster health: N/N" is SOFT: it is unproven while other nodes are still on
+# Flannel (§1a), so if only it fails the operator decides. Every kubectl/talosctl call that
+# can hang on a half-up node is wrapped in `timeout` (exit 124 = timed out; the loops treat
+# it like an empty answer and retry).
 wait_node() {   # wait_node <ip> <old-bootID>
-  local ip=$1 old=$2 n new pod st i
+  local ip=$1 old=$2 n new pod st hard_st i
   n=$(node_name "$ip") || return 1
   for i in $(seq 1 120); do                      # up to 20 min until the new boot shows up
-    new=$(kubectl get node "$n" -o jsonpath='{.status.nodeInfo.bootID}' 2>/dev/null)
+    new=$(timeout 30 kubectl get node "$n" -o jsonpath='{.status.nodeInfo.bootID}' 2>/dev/null)
     [[ -n $new && $new != "$old" ]] && break
     sleep 10
   done
   [[ -n $new && $new != "$old" ]] || { echo "FAIL: $n bootID never changed" >&2; return 1; }
-  kubectl wait --for=condition=Ready "node/$n" --timeout=600s || { echo "FAIL: $n not Ready" >&2; return 1; }
+  timeout 630 kubectl wait --for=condition=Ready "node/$n" --timeout=600s || { echo "FAIL: $n not Ready" >&2; return 1; }
   for i in $(seq 1 60); do                       # up to 10 min until the agent passes
-    pod=$(kubectl -n kube-system get pod -l k8s-app=cilium --field-selector "spec.nodeName=$n" \
+    pod=$(timeout 30 kubectl -n kube-system get pod -l k8s-app=cilium --field-selector "spec.nodeName=$n" \
           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-    st=$([[ -n $pod ]] && kubectl -n kube-system exec "$pod" -c cilium-agent -- cilium-dbg status --verbose 2>/dev/null)
+    st=$([[ -n $pod ]] && timeout 30 kubectl -n kube-system exec "$pod" -c cilium-agent -- cilium-dbg status --verbose 2>/dev/null)
+    hard_st=
     if grep -Eq '^ *KubeProxyReplacement: +True' <<<"$st" \
-       && grep -Eq '^ *Socket LB: +Enabled' <<<"$st" \
-       && awk '/^ *Cluster health:/ { split($3, a, "/"); ok = (a[1] == a[2] && a[2] > 0) } END { exit !ok }' <<<"$st"; then
-      echo "OK: $n new boot, Ready, KPR + Socket LB on, cluster health full"
-      return 0
+       && grep -Eq '^ *Socket LB: +Enabled' <<<"$st"; then
+      if awk '/^ *Cluster health:/ { split($3, a, "/"); ok = (a[1] == a[2] && a[2] > 0) } END { exit !ok }' <<<"$st"; then
+        echo "OK: $n new boot, Ready, KPR + Socket LB on, cluster health full"
+        return 0
+      fi
+      hard_st=$st                                # hard checks pass, only cluster health is short
     fi
     sleep 10
   done
-  echo "FAIL: Cilium agent on $n not verified (KPR / Socket LB / cluster health)" >&2
+  if [[ -n $hard_st ]]; then                     # ONLY the soft cluster-health check failed
+    echo "WARN: $n has KPR + Socket LB on, but cluster health is not full. Full status:" >&2
+    echo "$hard_st" >&2
+    confirm "cluster health not full, continue?" && return 0
+    echo "FAIL: stopped by operator, cluster health not full on $n" >&2
+    return 1
+  fi
+  echo "FAIL: Cilium agent on $n not verified (KPR / Socket LB)" >&2
   return 1
 }
 
 # etcd: exactly 3 members, one leader, same raft term, none learner, no ERRORS, applied index within 1000
 etcd_ok() {
-  talosctl --nodes "$(IFS=,; echo "${CPS[*]}")" etcd status 2>/dev/null | awk '
+  timeout 30 talosctl --nodes "$(IFS=,; echo "${CPS[*]}")" etcd status 2>/dev/null | awk '
     NR==1 { next }
     NF==0 { next }
     { for (i = 1; i <= NF; i++) if ($i ~ /%\)$/) break
@@ -588,7 +625,7 @@ vip_ok() {
 # control-plane gate: every check must pass, otherwise it returns 1
 cp_gate() {
   local x
-  kubectl -n kube-system rollout status ds/kube-vip-ds --timeout=180s \
+  timeout 200 kubectl -n kube-system rollout status ds/kube-vip-ds --timeout=180s \
     || { echo "FAIL: kube-vip-ds not fully ready" >&2; return 1; }
   for x in "${CPS[@]}"; do
     [[ $(kubectl --server "https://$x:6443" get --raw /readyz --request-timeout=10s 2>/dev/null) == ok ]] \
@@ -603,12 +640,12 @@ cp_gate() {
 reboot_node() {   # reboot_node <ip>
   local ip=$1 n old
   n=$(node_name "$ip") || return 1
-  old=$(kubectl get node "$n" -o jsonpath='{.status.nodeInfo.bootID}') || return 1
+  old=$(timeout 30 kubectl get node "$n" -o jsonpath='{.status.nodeInfo.bootID}') || return 1
   [[ -n $old ]] || { echo "FAIL: empty bootID for $n" >&2; return 1; }
   echo "== rebooting $n ($ip), old bootID $old =="
   talosctl reboot --nodes "$ip" || { echo "FAIL: talosctl reboot $ip" >&2; return 1; }
   wait_node "$ip" "$old" || return 1
-  kubectl uncordon "$n" || return 1
+  timeout 30 kubectl uncordon "$n" || return 1
 }
 
 # one control plane: access only via the OTHER CPs, gate, operator confirmation, reboot, gate again
@@ -627,14 +664,15 @@ cp_step() {   # cp_step <ip>
 
 ```bash
 use_cp "${CPS[@]}"
-kubectl rook-ceph ceph status   # HEALTH_OK except the noout warning, all PGs active+clean, mon quorum 3/3
+timeout 60 kubectl rook-ceph ceph status   # HEALTH_OK except the noout warning, all PGs active+clean, mon quorum 3/3
 ```
 
 Between later workers Ceph is **expected to be degraded** (the rebooted workers'
 OSDs sit on the Cilium island, the mons may still be on the Flannel island), so
 `ceph status` can hang or show down OSDs and inactive PGs. That is not a reason
 to stop. The gate for each following worker is: the previous node passed
-`wait_node` (new boot, Ready, KPR + Socket LB on, cluster health full), and its
+`wait_node` (new boot, Ready, KPR + Socket LB on; cluster health full, or you
+confirmed the "cluster health not full, continue?" prompt), and its
 pods are Running (`kubectl get pods -A -o wide | grep <node>`).
 Never run `osd out`, `osd purge` or `osd unset noout` in the window.
 
@@ -679,7 +717,7 @@ kubectl -n kube-system get pods -l app.kubernetes.io/name=kube-vip-ds -o wide
 kubectl -n kube-system logs ds/kube-vip-ds --tail=30
 # 3. Does the ClusterIP work from the host namespace on that node? (Cilium socket-LB; set NODE first)
 NODE=talos-xyz-abc
-kubectl -n kube-system exec "$(kubectl -n kube-system get pod -l k8s-app=cilium --field-selector "spec.nodeName=$NODE" -o name)" -c cilium-agent -- cilium-dbg service list | grep 10.96.0.1
+timeout 30 kubectl -n kube-system exec "$(kubectl -n kube-system get pod -l k8s-app=cilium --field-selector "spec.nodeName=$NODE" -o name)" -c cilium-agent -- cilium-dbg service list | grep 10.96.0.1
 # 4. Restart kube-vip (all three; the lease is re-elected within ~5 s)
 kubectl -n kube-system delete pod -l app.kubernetes.io/name=kube-vip-ds
 kubectl -n kube-system rollout status ds/kube-vip-ds --timeout=180s
@@ -696,7 +734,7 @@ VIP: `talosctl --endpoints <CP-IP> --nodes <CP-IP> version`.
 ```bash
 # Cilium healthy on every node, KPR active, no flannel/kube-proxy left
 kubectl -n kube-system get pods -l k8s-app=cilium -o wide
-kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium-dbg status --verbose | grep -E 'KubeProxyReplacement|Socket LB|Cluster health|Controller Status'
+timeout 30 kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium-dbg status --verbose | grep -E 'KubeProxyReplacement|Socket LB|Cluster health|Controller Status'
 kubectl get ds -A | grep -E 'flannel|kube-proxy' || echo clean
 kubectl get nodes -o wide                       # all Ready and schedulable (no SchedulingDisabled)
 
@@ -725,8 +763,18 @@ timeout 5 bash -c '</dev/tcp/192.168.1.72/8088' && echo tcp-gateway-open
 # Hubble UI, internal only
 curl -sk -o /dev/null -w '%{http_code}\n' --resolve hubble.internal.grendel71.net:443:192.168.1.69 https://hubble.internal.grendel71.net/
 
-# Ceph: skip the OSD crash-loop backoff after the last reboot, then require full recovery BEFORE removing noout
-kubectl -n rook-ceph delete pod -l app=rook-ceph-osd
+# Ceph: skip the OSD crash-loop backoff after the last reboot, then require full recovery BEFORE removing noout.
+# Gate first: all 3 mon pods Running and Ready (note: stale "Completed" pods of old ReplicaSets are normal).
+timeout 30 kubectl -n rook-ceph get pods -l 'app in (rook-ceph-mon,rook-ceph-osd)' -o wide
+mons_ok=$(timeout 30 kubectl -n rook-ceph get pods -l app=rook-ceph-mon --no-headers \
+  | awk '{ split($2, a, "/"); if ($3 == "Running" && a[1] == a[2]) n++ } END { print n + 0 }')
+if [[ $mons_ok -eq 3 ]]; then
+  # delete ONLY OSD pods that are not Running/Completed (CrashLoopBackOff, Error, ...), never healthy OSDs
+  timeout 30 kubectl -n rook-ceph get pods -l app=rook-ceph-osd --no-headers \
+    | awk '$3 != "Running" && $3 != "Completed" { print $1 }' | xargs -r kubectl -n rook-ceph delete pod
+else
+  echo "STOP: only $mons_ok/3 mon pods Running+Ready; fix the mons before touching OSD pods"
+fi
 kubectl rook-ceph ceph status                   # HEALTH_OK except noout, PGs active+clean, mon quorum 3/3
 kubectl rook-ceph ceph osd tree
 kubectl rook-ceph ceph osd unset noout          # re-enables marking down OSDs "out" (not backfill)
@@ -747,7 +795,11 @@ done
 kubectl -n kube-system scale deploy/redis-operator --replicas=1
 while read -r w r; do
   IFS=/ read -r ns kind name <<<"$w"
-  kubectl -n "$ns" scale "$kind/$name" --replicas="$r"
+  if [[ -n $r ]]; then
+    kubectl -n "$ns" scale "$kind/$name" --replicas="$r"
+  else
+    echo "SKIP: no recorded replica count for $w (scale it by hand)"
+  fi
 done < "$WIN/replicas.txt"
 
 # 3. Resume the Flux owners suspended in §2b (NEVER touch cilium / cilium-routes here)
@@ -892,6 +944,17 @@ kubectl -n kube-system get ds kube-flannel kube-proxy
   `v1.12.6` to `v1.13.0`. For Talos ≥ v1.14 the CNI/proxy settings move to the
   `KubeFlannelCNIConfig` / `KubeProxyConfig` documents (see §2); update this
   runbook then.
+- **Payments HTTPRoute (`papi`).** The gateway/host move to `envoy-internal` /
+  `papi.internal.grendel71.net` is done by a patch in `k8s/apps/payments/ks.yaml`.
+  The patch silently does nothing if the payment-processor repo renames the route.
+  Durable fix: set the internal gateway and host in
+  <https://github.com/grendel71/payment-processor> `k8s/httproute.yaml` and drop
+  the patch.
+- **Cloudflare side of `papi` (intentionally NOT in this branch).** After the
+  merge, the cloudflared wildcard still forwards `papi.grendel71.net` to
+  `envoy-external`, which now answers 404 for it, and external-dns (sync policy)
+  deletes the old `papi.grendel71.net` DNS record. Any Cloudflare/cloudflared
+  change is a separate, manual step.
 - **Phase 2, NetworkPolicy hardening:** audit the existing policies, fix the
   payments ingress selector (§1), add policies for `authentik`, `leaderboard`,
   `lifter`, `payments` and the `apps` namespace, a `cilium-policies` Kustomization
