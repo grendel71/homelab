@@ -1,0 +1,176 @@
+---
+# Cilium CNI + kube-proxy replacement + Hubble, on Talos.
+# Chart version pinned (not "x" wildcard) because a CNI upgrade is a cluster-wide
+# data-plane change that must be deliberate. See ../MIGRATION.md for the operator
+# runbook (declared maintenance window; this file is only applied after the
+# `cilium` Kustomization is un-suspended in git).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cilium
+  namespace: kube-system
+spec:
+  interval: 15m
+  timeout: 10m
+  releaseName: cilium
+  chart:
+    spec:
+      chart: cilium
+      version: 1.20.4
+      sourceRef:
+        kind: HelmRepository
+        name: cilium
+        namespace: flux-system
+      interval: 12h
+  # retries: 0 on purpose. Helm's automatic remediation of a failed install or
+  # upgrade means `helm uninstall` / rollback of the CNI, which would rip the pod
+  # network out from under every node. A failed release must be fixed by a human
+  # (see MIGRATION.md), never auto-remediated.
+  install:
+    # CUTOVER ONLY. Do not make the Helm install wait for every workload: during
+    # the maintenance window the pod network is split in two islands, so Hubble
+    # relay/UI (and the hubble cert Job) may not be Ready for a long time, and a
+    # Helm wait timeout would mark the release failed. MIGRATION.md gates on
+    # `rollout status` of the cilium DaemonSet and operator instead. Restoring
+    # the default (delete this line) after the migration is optional (§6).
+    disableWait: true
+    remediation:
+      retries: 0
+  upgrade:
+    remediation:
+      retries: 0
+  values:
+    # --- CNI / IPAM -------------------------------------------------------
+    # Reuse the existing per-node podCIDRs (10.244.0.0/16, assigned by the
+    # controller-manager and previously consumed by Flannel). Required by Talos.
+    ipam:
+      mode: kubernetes
+
+    # --- kube-proxy replacement (Talos KubePrism) --------------------------
+    kubeProxyReplacement: true
+    k8sServiceHost: localhost
+    k8sServicePort: 7445
+
+    # --- Routing: explicit VXLAN tunnel (matches the previous Flannel overlay
+    # behaviour; no host-routing/bird/BGP needed). -----------------------------
+    # tunnelPort is left at the default (UDP 8472). Talos' Flannel uses VXLAN on
+    # UDP 4789, so the two overlays do not clash on a port.
+    routingMode: tunnel
+    tunnelProtocol: vxlan
+
+    # --- Host routing / masquerade ----------------------------------------
+    # hostLegacyRouting: true comes from the Cilium migration guide
+    # (k8s-install-migration, values-migration.yaml: "Allow for routing between
+    # Cilium and the existing overlay"). It is needed while Flannel pods and
+    # Cilium pods coexist. It is harmless to keep after the migration (it only
+    # forgoes the optional eBPF host-routing speed-up), so MIGRATION.md §6 leaves it.
+    # NOT a Talos requirement: the Cilium-on-Talos guide's Known issues only
+    # list "forwardKubeDNSToHost + bpf.masquerade=true" (CoreDNS breaks). That is
+    # avoided by keeping masquerading on iptables (chart default, bpf.masquerade
+    # false below), independent of hostLegacyRouting.
+    bpf:
+      hostLegacyRouting: true
+      masquerade: false
+
+    # --- Existing CNI config -------------------------------------------------
+    # cni.exclusive (default true): Cilium takes ownership of /etc/cni/net.d and
+    # RENAMES every non-Cilium config (e.g. Flannel's) to *.cilium_bak as soon as
+    # the agent starts on a node. This is intended for the cutover.
+    # cni.uninstall false (also the default, set explicitly): never remove the
+    # CNI config on agent shutdown, so an agent restart/upgrade cannot leave a
+    # node without a CNI.
+    cni:
+      exclusive: true
+      uninstall: false
+
+    # --- Talos security context -------------------------------------------
+    # Exactly the capability set from the Talos / Cilium Talos guides: the chart
+    # defaults minus SYS_MODULE, because Talos does not let workloads load kernel
+    # modules.
+    securityContext:
+      capabilities:
+        ciliumAgent:
+          - CHOWN
+          - KILL
+          - NET_ADMIN
+          - NET_RAW
+          - IPC_LOCK
+          - SYS_ADMIN
+          - SYS_RESOURCE
+          - DAC_OVERRIDE
+          - FOWNER
+          - SETGID
+          - SETUID
+        cleanCiliumState:
+          - NET_ADMIN
+          - SYS_ADMIN
+          - SYS_RESOURCE
+
+    # --- cgroup: Talos already mounts cgroupv2 at /sys/fs/cgroup ----------
+    cgroup:
+      autoMount:
+        enabled: false
+      hostRoot: /sys/fs/cgroup
+
+    # --- Operator: 2 replicas for HA --------------------------------------
+    operator:
+      replicas: 2
+      # MIGRATION-ONLY. The operator would otherwise restart every pod that is
+      # not yet managed by Cilium, i.e. every pod still on the Flannel network,
+      # all at once. During the cutover we reboot nodes one by one instead.
+      # Restore the default (delete this block) in the follow-up commit after
+      # the migration succeeded (MIGRATION.md §6).
+      unmanagedPodWatcher:
+        restart: false
+
+    # --- Restart agent pods when the cilium-config ConfigMap changes -------
+    rollOutCiliumPods: true
+
+    # --- Policy enforcement -------------------------------------------------
+    # "never" for the migration: the existing NetworkPolicies (flux-system,
+    # payments) are NOT enforced. Flipped back to "default" in the Phase 2 commit
+    # together with audited/verified policies. Do not flip it earlier: the
+    # payments NetworkPolicy allows ingress only from pods labelled
+    # app.kubernetes.io/name=envoy-gateway, which matches neither the Envoy
+    # Gateway controller nor the Envoy proxy pods (see MIGRATION.md).
+    policyEnforcementMode: never
+
+    # --- Hubble (observability) --------------------------------------------
+    hubble:
+      enabled: true
+      tls:
+        auto:
+          # Generate the Hubble mTLS certificates with a Kubernetes (Cron)Job.
+          # No cert-manager needed, and no per-render certificate churn like the
+          # default `helm` method (which regenerates certs on every Helm render).
+          method: cronJob
+      metrics:
+        enabled:
+          - dns
+          - drop
+          - tcp
+          - flow
+          - icmp
+        # serviceMonitor.enabled stays false: no Prometheus Operator CRDs in this cluster.
+      relay:
+        enabled: true
+      ui:
+        enabled: true
+        # Hubble UI is exposed through envoy-internal via
+        # k8s/infrastructure/cilium/routes/httproute.yaml (hubble.internal.grendel71.net),
+        # NOT through the chart's built-in ingress.
+
+    # --- Transparent encryption: intentionally OFF in this stage ----------
+    # Follow-up (Phase 2): enable WireGuard node encryption.
+    # encryption:
+    #   enabled: true
+    #   type: wireguard
+    #   nodeEncryption: true
+
+    # --- NOT enabled (out of scope): --------------------------------------
+    #   - Cilium Gateway API / Ingress controller (Envoy Gateway stays)
+    #   - L2 announcements / LB-IPAM (MetalLB + kube-vip stay)
+    #   - BGP
+    # Cilium coexists with MetalLB L2 and kube-vip: it only installs its CNI
+    # Datapath, Hubble and the operator; it does not take over Service
+    # load-balancing or control-plane VIP assignment.

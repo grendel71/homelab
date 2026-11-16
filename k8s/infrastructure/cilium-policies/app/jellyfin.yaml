@@ -1,0 +1,46 @@
+---
+# jellyfin (namespace apps, ONLY the jellyfin pod, not the namespace).
+# HelmRelease jellyfin chart 2.7.0 (k8s/apps/jellyfin/app/helm-release.yaml);
+# public route jellyfin.grendel71.net on envoy-external -> Service jellyfin:8096
+# (k8s/apps/jellyfin/app/httproute.yaml). Container port `http` = 8096.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: jellyfin-ingress
+  namespace: apps
+spec:
+  # Live: 1 Running pod (jellyfin-7d8b96c9b8-*). The selector contains
+  # app.kubernetes.io/name=jellyfin, so no other pod in `apps` is selected.
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: jellyfin
+      app.kubernetes.io/instance: jellyfin
+  ingress:
+    # Envoy proxy of the external gateway -> Jellyfin web/API, TCP 8096 only.
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+            app.kubernetes.io/name: envoy
+            app.kubernetes.io/component: proxy
+            gateway.envoyproxy.io/owning-gateway-name: envoy-external
+      toPorts:
+        - ports:
+            - port: "8096"
+              protocol: TCP
+    # NOT allowed (no evidence in git): in-cluster clients such as
+    # sonarr/radarr/prowlarr/qbittorrent (ns torrent) notifying Jellyfin through
+    # jellyfin.apps.svc:8096. Their integration config lives in their own
+    # databases. This is a KNOWN LIKELY GAP and is on the pre-flip verification
+    # list (../README.md, section 5). If audit/Hubble shows any torrent-namespace
+    # source reaching jellyfin:8096, add:
+    #   - fromEndpoints:
+    #       - matchLabels:
+    #           k8s:io.kubernetes.pod.namespace: torrent
+    #     toPorts:
+    #       - ports: [{port: "8096", protocol: TCP}]
+# EGRESS is deliberately NOT restricted (default allow-all). Jellyfin fetches
+# metadata/images/plugins from the internet and may be configured (UI, stored on
+# the config PVC) for LAN sources such as tuners or DLNA, which cannot be proven
+# from git. The media NFS volume (192.168.1.231, PV grendel-jellyfin-pv-nfs) is
+# mounted by the kubelet in the host namespace, not by pod traffic, so it does
+# not need an egress rule either way.

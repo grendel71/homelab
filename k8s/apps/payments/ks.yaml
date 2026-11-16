@@ -17,6 +17,24 @@ spec:
   prune: true
   timeout: 5m
   wait: true
+  patches:
+    - patch: |-
+        - op: replace
+          path: /spec/parentRefs
+          value:
+            - name: envoy-internal
+              namespace: envoy-gateway-system
+              sectionName: websecure
+        - op: replace
+          path: /spec/hostnames
+          value:
+            - papi.internal.grendel71.net
+      target:
+        group: gateway.networking.k8s.io
+        version: v1
+        kind: HTTPRoute
+        name: payments-platform-internal
+        namespace: payments
   decryption:
     provider: sops
     secretRef:

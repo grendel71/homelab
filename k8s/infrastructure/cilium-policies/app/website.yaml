@@ -1,0 +1,69 @@
+---
+# website (namespace apps, ONLY the website pods, not the namespace).
+# HelmRelease app-template (k8s/apps/website/app/helm-release.yaml): a Caddy
+# reverse proxy that serves a static site from the Rook-Ceph RGW bucket
+# `my-bucket`. Public route me.grendel71.net on envoy-external -> Service
+# website:80. Caddyfile listens on `:80` only (443 is declared but unused).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: website-ingress
+  namespace: apps
+spec:
+  # Live: 3 Running pods (website-5c7c976c5d-*).
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: website
+      app.kubernetes.io/instance: website
+  ingress:
+    # Envoy proxy of the external gateway -> Caddy, TCP 80 only.
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+            app.kubernetes.io/name: envoy
+            app.kubernetes.io/component: proxy
+            gateway.envoyproxy.io/owning-gateway-name: envoy-external
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+---
+# Egress is provable here and fully restricted: the Caddyfile has exactly one
+# upstream, `reverse_proxy http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local`
+# (helm-release.yaml), plus DNS to resolve it. `:80` disables Caddy's automatic
+# HTTPS, so there is no ACME or other outbound traffic.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: website-egress
+  namespace: apps
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: website
+      app.kubernetes.io/instance: website
+  egress:
+    # DNS. No toFQDNs rule exists, so plain port 53 (no DNS proxy / rules.dns).
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    # RGW pods. Cilium (kube-proxy replacement) load-balances the Service
+    # before policy, so policy sees the backend port: Service rook-ceph/
+    # rook-ceph-rgw-ceph-objectstore 80 -> targetPort 8080 (live:
+    # kubectl get svc -n rook-ceph rook-ceph-rgw-ceph-objectstore).
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: rook-ceph
+            app: rook-ceph-rgw
+            rgw: ceph-objectstore
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP

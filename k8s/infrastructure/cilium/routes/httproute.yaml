@@ -1,0 +1,24 @@
+---
+# Hubble UI — internal-only, attached to the envoy-internal Gateway
+# (listener `websecure`, hostname *.internal.grendel71.net).
+# It must never be attached to the public or nx gateways.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: hubble-ui
+  namespace: kube-system
+spec:
+  parentRefs:
+    - name: envoy-internal
+      namespace: envoy-gateway-system
+      sectionName: websecure
+  hostnames:
+    - hubble.internal.grendel71.net
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: hubble-ui
+          port: 80

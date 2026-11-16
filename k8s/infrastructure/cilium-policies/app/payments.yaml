@@ -1,0 +1,141 @@
+---
+# payments (namespace payments): payments-platform API + payments-db (CNPG).
+# Manifests come from the external repo github.com/grendel71/payment-processor
+# (k8s/ + chart payments-platform 0.2.4). Audit: ../README.md, section "payments".
+#
+# Compensating policy for the upstream NetworkPolicy `payments-platform`, which
+# allows ingress only from pods labelled app.kubernetes.io/name=envoy-gateway.
+# No such pod exists (kubectl -n envoy-gateway-system get pods --show-labels:
+# controller = app.kubernetes.io/name=gateway-helm, proxies = name=envoy), so the
+# upstream policy would drop all ingress once enforcement is on. Allows are
+# additive, so this CNP fixes it without touching the upstream chart.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: payments-platform-ingress
+  namespace: payments
+spec:
+  # Live: 2 Running pods (payments-platform-8587c6cc7c-*), port 8000.
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: payments-platform
+      app.kubernetes.io/instance: payments-platform
+  ingress:
+    # Envoy data-plane proxies -> API, TCP 8000 only (containerPort `http`
+    # 8000; Service payments-platform 8000, HTTPRoute backendRef port 8000).
+    # Evidence: payment-processor k8s/httproute.yaml; labels from live
+    # `kubectl get pods -n envoy-gateway-system --show-labels`.
+    # Gateway state: the LIVE HTTPRoute payments-platform-internal (papi) is
+    # still on envoy-external. The commit that moves it to envoy-internal
+    # (2ecd14d, k8s/apps/payments/ks.yaml patch) exists only on the
+    # feat/cilium-hardening branch and is NOT on main yet. Allowing both
+    # gateways is therefore correct before AND after that merge. Once the route
+    # is live on envoy-internal only, envoy-external can be dropped from this
+    # allow list.
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+            app.kubernetes.io/name: envoy
+            app.kubernetes.io/component: proxy
+          matchExpressions:
+            - key: gateway.envoyproxy.io/owning-gateway-name
+              operator: In
+              values:
+                - envoy-internal
+                - envoy-external
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+---
+# Egress for the API: DNS + the payments-db CNPG pods on 5432, nothing else.
+# This duplicates the upstream NetworkPolicy egress on purpose (union = same
+# result) so egress stays locked down even if the chart's policy is disabled.
+# Evidence: the app only talks to its DB (DATABASE_URL secretKeyRef in the chart's
+# deployment.yaml; no outbound HTTP in app/; serviceAccount.automount: false so
+# no API-server access). Live NetworkPolicy payments/payments-platform egress.
+# No toFQDNs rules, so no DNS proxy (`rules.dns`) is needed, plain port 53.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: payments-platform-egress
+  namespace: payments
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: payments-platform
+      app.kubernetes.io/instance: payments-platform
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            cnpg.io/cluster: payments-db
+            cnpg.io/podRole: instance
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+---
+# payments-db (CNPG, 1 instance, pod payments-db-1). Ingress default-deny with:
+# the API and the migration Job (Helm hook, labels name=payments-platform-migration)
+# on 5432, the CNPG operator, and the instance pods themselves. Egress is left
+# OPEN: CNPG instance pods must reach the API server and replicas; not provable
+# to restrict without breaking failover.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: payments-db-ingress
+  namespace: payments
+spec:
+  endpointSelector:
+    matchLabels:
+      cnpg.io/cluster: payments-db
+      cnpg.io/podRole: instance
+  ingress:
+    # App + migration Job -> PostgreSQL. Evidence: upstream NetworkPolicy
+    # egress rules and values `database.existingSecret` (payments-db-rw:5432).
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/instance: payments-platform
+            app.kubernetes.io/name: payments-platform
+        - matchLabels:
+            app.kubernetes.io/instance: payments-platform
+            app.kubernetes.io/name: payments-platform-migration
+            app.kubernetes.io/component: migration
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    # CNPG operator (ns cnpg-system, pod app.kubernetes.io/name=cloudnative-pg)
+    # -> instance manager status API (8000) and PostgreSQL (5432).
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            app.kubernetes.io/name: cloudnative-pg
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+            - port: "5432"
+              protocol: TCP
+    # Instances of the same cluster (replication on 5432, status on 8000 for
+    # failover). Single instance today, kept so scaling out does not break.
+    - fromEndpoints:
+        - matchLabels:
+            cnpg.io/cluster: payments-db
+            cnpg.io/podRole: instance
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+            - port: "8000"
+              protocol: TCP
