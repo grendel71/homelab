@@ -7,3 +7,4 @@ metadata:
 resources:
   - release.yaml
   - resource-policies.yaml
+  - schedule.yaml

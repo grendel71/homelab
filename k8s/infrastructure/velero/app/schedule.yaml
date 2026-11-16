@@ -1,0 +1,19 @@
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: apps-daily
+  namespace: kube-system
+spec:
+  schedule: "CRON_TZ=America/New_York 0 2 * * *"
+  useOwnerReferencesInBackup: false
+  template:
+    ttl: 168h0m0s
+    storageLocation: default
+    snapshotVolumes: false
+    resourcePolicy:
+      kind: ConfigMap
+      name: velero-resource-policies
+    metadata:
+      labels:
+        backup.grendel71.net/tier: daily
