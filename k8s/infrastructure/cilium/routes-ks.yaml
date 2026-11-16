@@ -7,12 +7,19 @@
 # possible and cannot form a bootstrap cycle (Envoy Gateway needs a pod network
 # to run; on a fresh cluster Cilium would never install if it waited on the
 # gateway stack first).
+#
+# ############################################################################
+# GATED. Do not flip `suspend` to false until the MIGRATION.md cutover step.
+# Cutover = a git commit setting `suspend: false` (`flux resume` alone is
+# reverted by the parent `flux-system` Kustomization, which re-applies this file).
+# ############################################################################
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: cilium-routes
   namespace: flux-system
 spec:
+  suspend: true # GATED — see header comment and MIGRATION.md
   interval: 10m
   dependsOn:
     - name: cilium
@@ -22,5 +29,4 @@ spec:
     name: flux-system
   path: ./k8s/infrastructure/cilium/routes
   prune: true
-  wait: true
   timeout: 5m

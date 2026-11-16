@@ -5,12 +5,22 @@
 # switched from Flannel to Cilium. It does NOT depend on envoy-gateway-config (the
 # Hubble UI HTTPRoute lives in the separate `cilium-routes` Kustomization) so a
 # fresh bootstrap where Cilium is the only CNI cannot deadlock on the gateway stack.
+#
+# ############################################################################
+# GATED. Do not flip `suspend` to false until the MIGRATION.md cutover step.
+# Cutover = a git commit setting `suspend: false` (`flux resume` alone is
+# reverted by the parent `flux-system` Kustomization, which re-applies this file).
+# While suspended: nothing is installed, nothing is pruned, and every Kustomization
+# that `dependsOn: cilium` (e.g. `cilium-routes`, future cilium-policies) stays
+# blocked because this Kustomization never reports Ready.
+# ############################################################################
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: cilium
   namespace: flux-system
 spec:
+  suspend: true # GATED — see header comment and MIGRATION.md
   interval: 10m
   dependsOn:
     - name: sources
