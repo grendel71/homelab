@@ -1,0 +1,36 @@
+---
+# CiliumNetworkPolicies for the public-facing workloads (Phase 2 of the Flannel
+# -> Cilium migration). See ./README.md for the audit and the per-policy table.
+#
+# ############################################################################
+# GATED by `dependsOn: cilium`. The `cilium` Kustomization is committed with
+# `suspend: true`, so it never reports Ready and this Kustomization stays
+# blocked ("dependency 'flux-system/cilium' is not ready") until the cutover.
+# Besides the gating, the dependency is functionally required: the
+# CiliumNetworkPolicy CRD is created by the cilium-operator, so applying these
+# manifests before Cilium is installed would fail with "no matches for kind".
+#
+# The HelmRelease still sets `policyEnforcementMode: never`, so even after this
+# Kustomization applies, NOTHING is enforced (these policies are inert) until
+# the follow-up commit that flips it to `default` (see README.md, "Enabling
+# enforcement").
+# ############################################################################
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cilium-policies
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 2m
+  dependsOn:
+    - name: cilium
+    # Namespaces (authentik, leaderboard, lifter, payments, apps) are created by
+    # the `namespace` Kustomization.
+    - name: namespace
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./k8s/infrastructure/cilium-policies/app
+  prune: true
+  timeout: 5m

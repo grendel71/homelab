@@ -5,6 +5,7 @@ resources:
   - sources/ks.yaml
   - cilium/ks.yaml
   - cilium/routes-ks.yaml
+  - cilium-policies/ks.yaml
   - namespaces/ks.yaml
   - cert-manager/ks.yaml
   - cert-manager-issuers/ks.yaml
