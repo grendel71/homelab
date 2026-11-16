@@ -1,0 +1,72 @@
+---
+# Flux image automation for the lifter app.
+# The CI workflow in grendel71/lifter-api pushes an epoch tag (10 digits) for
+# both images on every push to main. sha- tags cannot be ordered by Flux, so
+# each policy selects the epoch tag with the highest number.
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: lifter-api
+  namespace: lifter
+spec:
+  image: bhcr8192.duckdns.org/lifter-api
+  interval: 10m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: lifter-api-policy
+  namespace: lifter
+spec:
+  imageRepositoryRef:
+    name: lifter-api
+  filterTags:
+    pattern: '^\d{10}$'
+  policy:
+    numerical:
+      order: asc
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: lifter-web
+  namespace: lifter
+spec:
+  image: bhcr8192.duckdns.org/lifter-web
+  interval: 10m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: lifter-web-policy
+  namespace: lifter
+spec:
+  imageRepositoryRef:
+    name: lifter-web
+  filterTags:
+    pattern: '^\d{10}$'
+  policy:
+    numerical:
+      order: asc
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: lifter-update
+  namespace: lifter
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  git:
+    commit:
+      author:
+        email: fluxcdbot@users.noreply.github.com
+        name: fluxcdbot
+    push:
+      branch: main
+  update:
+    strategy: Setters
+    path: ./k8s/apps/lifter/app

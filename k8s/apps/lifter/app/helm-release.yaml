@@ -17,8 +17,8 @@ spec:
           app:
             image:
               repository: bhcr8192.duckdns.org/lifter-api
-              # Pin to sha-<commit> after the first CI build.
-              tag: latest
+              # Flux image automation sets this to the newest epoch tag.
+              tag: "latest" # {"$imagepolicy": "lifter:lifter-api-policy:tag"}
             ports:
               - name: http
                 containerPort: 8000
@@ -44,6 +44,8 @@ spec:
                   secretKeyRef:
                     name: lifter-app-secret
                     key: privkey
+              - name: MAX_INVITE_HOURS
+                value: "168"
             resources:
               requests:
                 memory: 128Mi
@@ -57,8 +59,8 @@ spec:
           app:
             image:
               repository: bhcr8192.duckdns.org/lifter-web
-              # Pin to sha-<commit> after the first CI build.
-              tag: latest
+              # Flux image automation sets this to the newest epoch tag.
+              tag: "latest" # {"$imagepolicy": "lifter:lifter-web-policy:tag"}
             ports:
               - name: http
                 containerPort: 80

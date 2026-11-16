@@ -6,3 +6,4 @@ resources:
   - db.yaml
   - secret-db.yaml
   - secret-app.yaml
+  - image.yaml
