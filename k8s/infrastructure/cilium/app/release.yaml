@@ -1,0 +1,126 @@
+---
+# Cilium CNI + kube-proxy replacement + Hubble, on Talos.
+# Chart version pinned (not "x" wildcard) because a CNI upgrade is a cluster-wide
+# data-plane change that must be deliberate. See MIGRATION.md for the operator runbook.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cilium
+  namespace: kube-system
+spec:
+  interval: 15m
+  timeout: 10m
+  releaseName: cilium
+  chart:
+    spec:
+      chart: cilium
+      version: 1.20.4
+      sourceRef:
+        kind: HelmRepository
+        name: cilium
+        namespace: flux-system
+      interval: 12h
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    # --- CNI / IPAM -------------------------------------------------------
+    # Reuse the existing per-node podCIDRs assigned by Flannel (10.244.0.0/16).
+    ipam:
+      mode: kubernetes
+
+    # --- kube-proxy replacement (Talos KubePrism) --------------------------
+    kubeProxyReplacement: true
+    k8sServiceHost: localhost
+    k8sServicePort: 7445
+
+    # --- Routing: keep the VXLAN tunnel explicit (matches the current
+    # Flannel overlay behaviour; no host-routing/bird/BGP needed). ----------
+    routingMode: tunnel
+    tunnelProtocol: vxlan
+
+    # --- Masquerade via iptables (the chart default). bpf.masquerade is kept
+    # off: simpler, and avoids the known Talos forwardKubeDNSToHost interaction. --
+    bpf:
+      masquerade: false
+
+    # --- Talos security context -------------------------------------------
+    # Talos does not allow workloads to load kernel modules, so SYS_MODULE is
+    # dropped from the chart defaults. PERFMON and BPF are added (supported on
+    # the Talos 6.18 kernel) to reduce the reliance on SYS_ADMIN.
+    securityContext:
+      capabilities:
+        ciliumAgent:
+          - CHOWN
+          - KILL
+          - NET_ADMIN
+          - NET_RAW
+          - IPC_LOCK
+          - SYS_ADMIN
+          - SYS_RESOURCE
+          - PERFMON
+          - BPF
+          - DAC_OVERRIDE
+          - FOWNER
+          - SETGID
+          - SETUID
+        cleanCiliumState:
+          - NET_ADMIN
+          - SYS_ADMIN
+          - SYS_RESOURCE
+
+    # --- cgroup: Talos already mounts cgroupv2 at /sys/fs/cgroup ----------
+    cgroup:
+      autoMount:
+        enabled: false
+      hostRoot: /sys/fs/cgroup
+
+    # --- Operator: 2 replicas for HA --------------------------------------
+    operator:
+      replicas: 2
+
+    # --- Restart agent pods when the cilium-config ConfigMap changes -------
+    rollOutCiliumPods: true
+
+    # --- Policy enforcement -------------------------------------------------
+    # "default" = enforce only for pods selected by a NetworkPolicy/CiliumNetworkPolicy.
+    # NOTE: existing NetworkPolicies in flux-system and payments will start being
+    # ENFORCED as soon as Cilium runs (Flannel never enforced them). See MIGRATION.md.
+    policyEnforcementMode: default
+
+    # --- Hubble (observability) --------------------------------------------
+    hubble:
+      enabled: true
+      metrics:
+        enabled:
+          - dns
+          - drop
+          - tcp
+          - flow
+          - icmp
+        # serviceMonitor.enabled stays false: no Prometheus Operator CRDs in this cluster.
+      relay:
+        enabled: true
+      ui:
+        enabled: true
+        # Hubble UI is exposed through envoy-internal via
+        # k8s/infrastructure/cilium/routes/httproute.yaml (hubble.internal.grendel71.net),
+        # NOT through the chart's built-in ingress.
+
+    # --- Transparent encryption: intentionally OFF in this stage ----------
+    # Follow-up (Phase 2): enable WireGuard node encryption.
+    # encryption:
+    #   enabled: true
+    #   type: wireguard
+    #   nodeEncryption: true
+
+    # --- NOT enabled (out of scope): --------------------------------------
+    #   - Cilium Gateway API / Ingress controller (Envoy Gateway stays)
+    #   - L2 announcements / LB-IPAM (MetalLB + kube-vip stay)
+    #   - BGP
+    # Cilium coexists with MetalLB L2 and kube-vip: it only installs its CNI
+    # Datapath, Hubble and the operator; it does not take over Service
+    # load-balancing or control-plane VIP assignment.

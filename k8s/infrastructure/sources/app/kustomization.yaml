@@ -5,6 +5,7 @@ resources:
   - arc.yaml
   - arc-oci.yaml
   - cert-manager.yaml
+  - cilium.yaml
   - cnpg.yaml
   - envoy-gateway.yaml
   - immich.yaml

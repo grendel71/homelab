@@ -1,0 +1,32 @@
+---
+# Cilium CNI + kube-proxy replacement + Hubble.
+# Installed into kube-system. Depends only on `sources` (the HelmRepository) so it
+# can be reconciled as early as possible — critical while the pod network is being
+# switched from Flannel to Cilium. It does NOT depend on envoy-gateway-config (the
+# Hubble UI HTTPRoute lives in the separate `cilium-routes` Kustomization) so a
+# fresh bootstrap where Cilium is the only CNI cannot deadlock on the gateway stack.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cilium
+  namespace: flux-system
+spec:
+  interval: 10m
+  dependsOn:
+    - name: sources
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./k8s/infrastructure/cilium/app
+  prune: true
+  wait: true
+  timeout: 10m
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: DaemonSet
+      name: cilium
+      namespace: kube-system
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: cilium-operator
+      namespace: kube-system
