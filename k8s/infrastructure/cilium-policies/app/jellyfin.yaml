@@ -28,9 +28,11 @@ spec:
             - port: "8096"
               protocol: TCP
     # NOT allowed (no evidence in git): in-cluster clients such as
-    # sonarr/radarr (ns torrent) notifying Jellyfin through
+    # sonarr/radarr/prowlarr/qbittorrent (ns torrent) notifying Jellyfin through
     # jellyfin.apps.svc:8096. Their integration config lives in their own
-    # databases. If one exists, add (after checking with Hubble):
+    # databases. This is a KNOWN LIKELY GAP and is on the pre-flip verification
+    # list (../README.md, section 5). If audit/Hubble shows any torrent-namespace
+    # source reaching jellyfin:8096, add:
     #   - fromEndpoints:
     #       - matchLabels:
     #           k8s:io.kubernetes.pod.namespace: torrent

@@ -25,9 +25,13 @@ spec:
     # 8000; Service payments-platform 8000, HTTPRoute backendRef port 8000).
     # Evidence: payment-processor k8s/httproute.yaml; labels from live
     # `kubectl get pods -n envoy-gateway-system --show-labels`.
-    # The route is moved to envoy-internal by k8s/apps/payments/ks.yaml (patch),
-    # but the live HTTPRoute is still on envoy-external until that reconciles,
-    # so both gateways are allowed. Drop envoy-external later if desired.
+    # Gateway state: the LIVE HTTPRoute payments-platform-internal (papi) is
+    # still on envoy-external. The commit that moves it to envoy-internal
+    # (2ecd14d, k8s/apps/payments/ks.yaml patch) exists only on the
+    # feat/cilium-hardening branch and is NOT on main yet. Allowing both
+    # gateways is therefore correct before AND after that merge. Once the route
+    # is live on envoy-internal only, envoy-external can be dropped from this
+    # allow list.
     - fromEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: envoy-gateway-system

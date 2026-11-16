@@ -30,6 +30,8 @@ spec:
 # api: not routed publicly (the HTTPRoute only has the web backend), reached
 # only by the web pod (INFERRED, not provable from git: the SPA/proxy in the web
 # image must reach Service api:8080, since the route has no api backend).
+# On the pre-flip verification list (../README.md, section 5): confirm with
+# audit/Hubble that web -> api:8080 is the real flow before enforcing.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -99,18 +101,45 @@ spec:
             - port: "8000"
               protocol: TCP
 ---
-# Egress: block access to the LAN and to the cluster nodes (SSRF / lateral
-# movement from a public-facing app), keep everything else open.
+# Egress: block direct access to the LAN, the cluster nodes and the internal
+# reverse-proxy paths (SSRF / lateral movement from a public-facing app), keep
+# everything else open. WHAT THIS DOES AND DOES NOT COVER:
+#  * Cilium kube-proxy replacement translates a Service frontend (ClusterIP,
+#    NodePort, MetalLB LoadBalancer VIP) to a BACKEND before policy is
+#    evaluated, so policy never sees the VIP (192.168.1.67-.72). A destination
+#    CIDR deny therefore does NOT cover a LoadBalancer VIP whose backends are
+#    pods. The proxies behind the internal VIPs are denied by identity instead:
+#      - envoy-internal (.69: router, pve, truenas, dns, s3, rook, hubble, the
+#        *arr apps... on *.internal.grendel71.net), envoy-nx (.71) and tcp-gateway
+#        (.72): Envoy proxy pods in envoy-gateway-system, selected by the
+#        gateway.envoyproxy.io/owning-gateway-name label. Live: 1 Running pod
+#        each (3 together).
+#      - traefik-internal (.68): pods app.kubernetes.io/name=traefik in
+#        namespace traefik-internal. Live: 1 Running pod.
+#    envoy-external (.67) is NOT denied: it is this app's own public path, and
+#    nothing in helm-release.yaml makes the app call a hostname (the only
+#    grendel71.net name in the file is its own route). If a pod's resolver
+#    returned an internal gateway VIP for a public name, that path would be
+#    blocked, which is intended.
+#  * Also blocked: direct LAN IPs (192.168.0.0/16, includes the VIP/node
+#    addresses if a pod dials them as plain IPs without Service translation),
+#    NodePort on a node IP and kube-apiserver (`host` + `remote-node`, node IPs
+#    192.168.1.145/.176/.154 and VIP .100), and Services whose backends are LAN
+#    IPs (selectorless Services such as kube-system pve/pve2).
+#  * NOT blocked (residual): any other pod reachable through a ClusterIP
+#    Service or pod IP (10.244.0.0/16 / 10.96.0.0/12), e.g. other apps'
+#    Services or in-cluster admin UIs. This policy is not in-cluster
+#    segmentation. Add ingress policies on those targets or extend this deny
+#    if needed.
 #  * Nothing in the manifests points these pods at a LAN or node address: the
 #    full env of both containers is in helm-release.yaml (DB host
 #    leaderboard-db-rw, in-cluster, and app settings only). Image pulls and the
 #    NFS/CSI mounts are done by the kubelet on the host, not by pod traffic.
+#    These apps do not use the Kubernetes API (no ServiceAccount use, no k8s
+#    client in the env).
 #  * enableDefaultDeny.egress=false is REQUIRED: with the chart default
 #    enableNonDefaultDenyPolicies=true a policy that only has egressDeny would
 #    otherwise switch the pods to egress default-deny and drop all egress.
-#  * `host` + `remote-node` also cover the kube-apiserver (control-plane node
-#    IPs 192.168.1.145/.176/.154 and VIP .100 via the CIDR). These apps do not
-#    use the Kubernetes API (no ServiceAccount use, no k8s client in the env).
 #  * Deny wins over allow in Cilium, so no LAN destination is allowed here. If a
 #    LAN dependency is ever added (SMTP relay, NFS client, LDAP...), carve it out
 #    by changing this policy (deny with except), not by adding an allow.
@@ -134,3 +163,23 @@ spec:
     - toEntities:
         - host
         - remote-node
+    # Internal-facing Envoy Gateway proxies (admin UIs behind envoy-internal,
+    # envoy-nx, tcp-gateway). envoy-external is deliberately NOT listed.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+            app.kubernetes.io/name: envoy
+            app.kubernetes.io/component: proxy
+          matchExpressions:
+            - key: gateway.envoyproxy.io/owning-gateway-name
+              operator: In
+              values:
+                - envoy-internal
+                - envoy-nx
+                - tcp-gateway
+    # Traefik internal ingress (LoadBalancer 192.168.1.68).
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: traefik-internal
+            app.kubernetes.io/name: traefik
+            app.kubernetes.io/instance: traefik-internal-traefik-internal
