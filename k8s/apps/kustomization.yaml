@@ -12,7 +12,6 @@ resources:
   - immich/ks.yaml
   - open-webui/ks.yaml
   - payments/ks.yaml
-  - leaderboard/ks.yaml
   - firefox/ks.yaml
   - searxng/ks.yaml
   - example-pg/ks.yaml

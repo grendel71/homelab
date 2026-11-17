@@ -118,7 +118,7 @@ Two automated backups run. Both write to the **same S3 bucket**, `velero`, on **
 - Velero is installed in `kube-system`, **not** `velero`. Always pass `-n kube-system` to the `velero` CLI.
 - Running `v1.19.0-rc.1` (prerelease) on Helm chart `12.2.5`, with `velero-plugin-for-aws:v1.15.0-rc.1`. The dev shell CLI is `v1.18.x`. It works but prints a version warning.
 - **Opt in a namespace** with the label `backup.grendel71.net/enabled: "true"` on its `Namespace` object (`k8s/infrastructure/namespaces/app/<name>.yaml`). The resource policy selects namespaces by this label. This needs Velero 1.19. Do not roll back to 1.18 while the policy ConfigMap exists. 1.18 ignores the label rule and could back up all namespaces.
-- Opted-in now: `ai`, `apps`, `authentik`, `immich`, `leaderboard`, `lifter`, `litellm`, `nextcloud-new`, `pappwiki`, `torrent`, `vaultwarden`. `payments` is not labeled. Its namespace comes from the external `payment-processor` repo.
+- Opted-in now: `ai`, `apps`, `authentik`, `immich`, `lifter`, `litellm`, `nextcloud-new`, `pappwiki`, `torrent`, `vaultwarden`. `payments` is not labeled. Its namespace comes from the external `payment-processor` repo.
 - **NFS volume data is skipped** by a `volumePolicies` rule (`nfs: {}` → `skip`). The PVC and PV objects are still backed up. The NFS data must be backed up on the NAS.
 - The policy ConfigMap `velero-resource-policies` must stay in `kube-system` and must have **exactly one** data key.
 - Volume data uses file-system backup (`defaultVolumesToFsBackup: true`, Kopia). It only backs up volumes of **running** pods.

@@ -25,7 +25,7 @@ spec:
   retryInterval: 2m
   dependsOn:
     - name: cilium
-    # Namespaces (authentik, leaderboard, lifter, payments, apps) are created by
+    # Namespaces (authentik, lifter, payments, apps) are created by
     # the `namespace` Kustomization.
     - name: namespace
   sourceRef:

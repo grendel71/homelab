@@ -173,7 +173,7 @@ stay default-allow** (no policy selects them).
     `k8s-app=kube-dns` and the Cilium DNS proxy (`rules.dns`) is deliberately
     not engaged. **A future `toFQDNs` rule must add `rules.dns:
     [{matchPattern: "*"}]` on the DNS rule.**
-  - `leaderboard`, `lifter`: LAN/nodes denied, everything else open (see below).
+  - `lifter`: LAN/nodes denied, everything else open (see below).
   - `authentik`, `jellyfin`: egress left **open** (destinations are configured
     at runtime in the app, not in git).
 - **Prometheus:** none exists in the cluster (no monitoring namespace, no
@@ -182,8 +182,7 @@ stay default-allow** (no policy selects them).
 - **No policy selects** pods in `kube-system`, `rook-ceph`, `flux-system`,
   `cnpg-system`, `metallb-system`, `envoy-gateway-system`, `cilium`, nor any
   other pod in `apps` than jellyfin and website.
-- **LAN/node/internal-proxy deny** (`leaderboard-egress-deny-lan`,
-  `lifter-egress-deny-lan`): `egressDeny` to `192.168.0.0/16`, entities `host`
+- **LAN/node/internal-proxy deny** (`lifter-egress-deny-lan`): `egressDeny` to `192.168.0.0/16`, entities `host`
   and `remote-node`, and the internal reverse-proxy pods (below), with
   `enableDefaultDeny.egress: false`.
   - **Why proxy pods are listed.** With kube-proxy replacement Cilium
@@ -211,7 +210,7 @@ stay default-allow** (no policy selects them).
     ClusterIP Service or pod IP (`10.244.0.0/16`, `10.96.0.0/12`), i.e. other
     in-cluster apps and admin UIs. This is not in-cluster segmentation. A new
     internal gateway or proxy added later is **not** covered until it is added
-    to the deny list in `app/leaderboard.yaml` and `app/lifter.yaml`.
+    to the deny list in `app/lifter.yaml`.
 
   The `enableDefaultDeny.egress: false` field is mandatory: with the
   chart default `enableNonDefaultDenyPolicies: true`, a policy that has only
@@ -233,10 +232,6 @@ Live pod counts are Running pods matched by the selector (read-only
 | `authentik-server-ingress` | authentik | server (`component=server`) (1) | Envoy `envoy-external` :9000; authentik worker :9000,:9443 (defensive) | open | `httproute.yaml` (authentik-server:80 -> 9000, live endpoints) |
 | `authentik-worker-ingress` | authentik | worker (`component=worker`) (1) | authentik server :9000 (defensive) | open | no Service/consumer found for the worker |
 | `authentik-db-ingress` | authentik | `cnpg.io/cluster=authentik-db` (1) | authentik pods :5432; cnpg operator :8000,:5432; same cluster | open | `helm-release.yaml` (`authentik-db-rw.authentik.svc`), `db.yaml` |
-| `leaderboard-web-ingress` | leaderboard | `controller=web` (1) | Envoy `envoy-external` :80 | n/a | `helm-release.yaml` route backend `web:80` |
-| `leaderboard-api-ingress` | leaderboard | `controller=api` (1) | leaderboard web :8080 | n/a | Service `api` 8080; inferred web -> api |
-| `leaderboard-db-ingress` | leaderboard | `cnpg.io/cluster=leaderboard-db` (1) | api :5432; cnpg operator :8000,:5432; same cluster | open | `DATABASE_URL=...leaderboard-db-rw:5432` |
-| `leaderboard-egress-deny-lan` | leaderboard | `name=leaderboard,instance=leaderboard` (2) | n/a | all except `192.168.0.0/16`, `host`, `remote-node`, Envoy proxies `envoy-internal`/`envoy-nx`/`tcp-gateway` (3 pods), traefik-internal (1 pod). Other in-cluster Services stay reachable (section 2) | full container env in `helm-release.yaml`: no LAN/node dependency |
 | `lifter-web-ingress` | lifter | `controller=web` (1) | Envoy `envoy-external` :80 | n/a | `helm-release.yaml` route backend `web:80` |
 | `lifter-api-ingress` | lifter | `controller=api` (1) | lifter web :8000 | n/a | `helm-release.yaml`: "web image proxies /api/ to http://api:8000" |
 | `lifter-db-ingress` | lifter | `cnpg.io/cluster=lifter-db` (1) | api :5432; cnpg operator :8000,:5432; same cluster | open | `PG_HOST=lifter-db-rw`, `PG_PORT=5432` |
@@ -344,7 +339,7 @@ traffic and records a policy-verdict event with verdict `AUDIT` (printed as
 `policy-verdict:none AUDITED`) for every connection that would have been
 dropped. In the v1.20.4 datapath (`bpf/lib/policy.h`) any policy error result
 is turned into "allow + audited", which includes explicit `egressDeny` matches,
-so denied destinations of `leaderboard`/`lifter` are audited too instead of
+so denied destinations of `lifter` are audited too instead of
 dropped. Audit mode documents L3/L4 only (these policies have no L7 rules).
 **Everything is unenforced in this state**, including the upstream payments
 NetworkPolicy; it is a discovery state, not a safe end state.
@@ -362,8 +357,7 @@ the source `namespace/pod:port`):
 
 Rule: for traffic **to** the protected pods, a source that is not
 `envoy-gateway-system`, `cnpg-system` or the same namespace needs an allow (or
-is a flow you intend to keep blocked). For `leaderboard-egress-deny-lan` and
-`lifter-egress-deny-lan`, any audited egress means a real LAN/proxy
+is a flow you intend to keep blocked). For `lifter-egress-deny-lan`, any audited egress means a real LAN/proxy
 dependency that must be carved out of the deny before enforcing.
 
 Targeted per-target view (adjust the pod name prefix; useful to see exactly who
@@ -386,11 +380,9 @@ that was not verified on this cluster, so treat it as a hint, not a result.
   evidence in git); uncomment/add it if audit shows these sources.
 - Any in-cluster source -> `authentik-server` :9000 (outposts, other apps doing
   OIDC discovery against `authentik-server.authentik.svc`). None known in git.
-- `leaderboard` web -> `leaderboard` api :8080 is **inferred** (the route only
-  has a `web` backend; the SPA/proxy must reach `api` somehow). Confirm the
-  flow exists and uses 8080. Same check for `lifter` web -> api :8000 (that one
-  is documented in `helm-release.yaml`).
-- Egress audits of `leaderboard`/`lifter` pods (LAN, node, internal proxy
+- `lifter` web -> api :8000 is documented in `helm-release.yaml`. Confirm the
+  flow exists.
+- Egress audits of `lifter` pods (LAN, node, internal proxy
   destinations) should be empty.
 
 **Step C: real enforcement.** Delete the `policyAuditMode` key (or set it to
@@ -423,17 +415,16 @@ After the flip, verify:
 for p in $(kubectl -n kube-system get pods -l k8s-app=cilium -o name); do
   kubectl -n kube-system exec "$p" -c cilium-agent -- \
     hubble observe --verdict DROPPED --last 500
-done                                                      # expect nothing for the 5 namespaces below
+done                                                      # expect nothing for the 4 namespaces below
 curl -sI https://jellyfin.grendel71.net | head -1       # 200/302
 curl -sI https://me.grendel71.net | head -1
 curl -sI https://ak.grendel71.net | head -1
-curl -sI https://strength.grendel71.net | head -1
 curl -sI https://lifter.grendel71.net | head -1
 kubectl get clusters.postgresql.cnpg.io -A              # all "healthy"
 flux get kustomizations                                  # no new False entries
 ```
 
-The five namespaces with policies: `payments`, `authentik`, `leaderboard`,
+The four namespaces with policies: `payments`, `authentik`,
 `lifter`, `apps` (jellyfin and website pods only).
 
 ### 5.4 Rollback
@@ -447,7 +438,6 @@ other CNPs may live there):
 flux suspend kustomization cilium-policies -n flux-system
 kubectl delete cnp -n payments payments-platform-ingress payments-platform-egress payments-db-ingress
 kubectl delete cnp -n authentik authentik-server-ingress authentik-worker-ingress authentik-db-ingress
-kubectl delete cnp -n leaderboard leaderboard-web-ingress leaderboard-api-ingress leaderboard-db-ingress leaderboard-egress-deny-lan
 kubectl delete cnp -n lifter lifter-web-ingress lifter-api-ingress lifter-db-ingress lifter-egress-deny-lan
 kubectl delete cnp -n apps jellyfin-ingress website-ingress website-egress
 ```

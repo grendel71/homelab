@@ -20,7 +20,6 @@ resources:
   - arc.yaml
   - payments.yaml
   - torrent.yaml
-  - leaderboard.yaml
   - ai.yaml
   - litellm.yaml
   - lifter.yaml
