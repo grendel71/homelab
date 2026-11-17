@@ -8,4 +8,5 @@ resources:
   - immich-ml.yaml
   - lazywarden-backup-nfs.yaml
   - torrent-nfs.yaml
+  - hermes-nfs.yaml
   - syncthing-nfs.yaml
