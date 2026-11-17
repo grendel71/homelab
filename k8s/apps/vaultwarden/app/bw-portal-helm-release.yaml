@@ -24,7 +24,7 @@ spec:
           app:
             image:
               repository: bhcr8192.duckdns.org/bitwarden-portal
-              tag: "1793240197" # {"$imagepolicy": "vaultwarden:bitwarden-portal-policy:tag"}
+              tag: "1794893946" # {"$imagepolicy": "vaultwarden:bitwarden-portal-policy:tag"}
             ports:
               - name: http
                 containerPort: 8000
@@ -69,7 +69,7 @@ spec:
           app:
             image:
               repository: bhcr8192.duckdns.org/bitwarden-portal
-              tag: "1793240197" # {"$imagepolicy": "vaultwarden:bitwarden-portal-policy:tag"}
+              tag: "1794893946" # {"$imagepolicy": "vaultwarden:bitwarden-portal-policy:tag"}
             command:
               - rq
               - worker
