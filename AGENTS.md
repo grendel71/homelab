@@ -84,14 +84,16 @@ Check state with `flux get kustomizations` and `flux get helmreleases -A`.
 ## Networking
 
 - **kube-vip** VIP `192.168.1.100` is the control plane API endpoint. Node configs exclude it from kubelet `nodeIP` (`'!192.168.1.100/32'`) and from etcd `advertisedSubnets`.
-- **Metallb** pool: `192.168.1.69` (Envoy Gateway external) and `192.168.1.70` (Envoy Gateway internal).
+- **CNI: Cilium** (`k8s/infrastructure/cilium/`, chart 1.20.4) with kube-proxy replacement, VXLAN tunnel and Hubble. It replaced Flannel and kube-proxy in Nov 2026. Talos is patched with `cluster.network.cni.name: none` and `cluster.proxy.disabled: true` (see below). Hubble UI: `hubble.internal.grendel71.net` (internal only). Migration runbook and lessons: `k8s/infrastructure/cilium/MIGRATION.md`.
+- **Network policy:** 17 `CiliumNetworkPolicy` objects live in `k8s/infrastructure/cilium-policies/` (README there has the audit, the policy table and the enforcement procedure). Enforcement is set in `cilium/app/release.yaml`. Currently `policyEnforcementMode: default` with `policyAuditMode: true`, which means audit only: nothing is dropped. Remove `policyAuditMode` to enforce.
+- **Metallb** LoadBalancer IPs (live): `192.168.1.67` envoy-external (public, Cloudflare Tunnel target), `192.168.1.69` envoy-internal, `192.168.1.68` traefik-internal, `192.168.1.71` envoy-nx, `192.168.1.72` tcp-gateway. Read the live values with `kubectl get svc -A | grep LoadBalancer`; the pool is `k8s/infrastructure/metallb-config/app/ipaddresspool.yaml`.
 - **Dual gateway**: Envoy Gateway handles external HTTPS (TLS via cert-manager + Cloudflare DNS challenge). Traefik handles internal-only ingress. Apps choose `internal`, `external` or both with HTTPRoute `parentRefs`.
 - **external-dns** syncs HTTPRoute hostnames to Cloudflare DNS.
 - **cloudflared** provides a Cloudflare Tunnel without port forwarding.
 
 ## Storage
 
-- **Rook Ceph** (`useAllNodes`/`useAllDevices`): `ceph-block` StorageClass (RWO) and an S3 object store (`s3.envoy.grendel71.net`). OSDs run on the workers.
+- **Rook Ceph** (`useAllNodes`/`useAllDevices`): `replicated-x3-block-store` StorageClass (RBD, RWO, reclaim `Retain`) and an S3 object store (`s3.envoy.grendel71.net`). OSDs run on the workers.
 - Static NFS/CSI PVs for media, Nextcloud and Immich volumes.
 - Ceph commands: `kubectl rook-ceph ceph status`, `kubectl rook-ceph ceph osd tree`.
 - `scripts/rook-password.sh` gets the Ceph dashboard password.
@@ -177,4 +179,7 @@ Do not print the credential values.
 - GPU workloads (Open WebUI) need the NVIDIA operator (`k8s/infrastructure/nvidia-operator`) and nodes with the NVIDIA factory image and the kernel module patch.
 - Kustomizations that fail do not block the rest of Flux. Check `flux get kustomizations` for `False` entries.
 - Velero does **not** back up etcd. etcd has its own CronJob. See [Backups](#backups).
+- A new `HelmRelease` health check in a `ks.yaml` must use the **`targetNamespace`** of that Kustomization, not the app's name (the `searxng` check pointed at the wrong namespace and failed for months).
+- Talos machine configs must keep `cluster.network.cni.name: none` and `cluster.proxy.disabled: true`. Without them a later `talosctl apply-config` or `upgrade-k8s` renders Flannel and kube-proxy again next to Cilium. Add both keys to the git-ignored `talos-infra/*.yaml`.
+- `cilium` and `cilium-routes` Kustomizations are no longer suspended. Do not suspend or remove `cilium`: `prune: true` would uninstall the CNI. Change Cilium values only through git; a values change rolls every agent.
 - A new app namespace is **not** backed up until you add the `backup.grendel71.net/enabled: "true"` label. See [Backups](#backups).
