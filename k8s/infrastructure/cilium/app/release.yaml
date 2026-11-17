@@ -115,13 +115,6 @@ spec:
     # --- Operator: 2 replicas for HA --------------------------------------
     operator:
       replicas: 2
-      # MIGRATION-ONLY. The operator would otherwise restart every pod that is
-      # not yet managed by Cilium, i.e. every pod still on the Flannel network,
-      # all at once. During the cutover we reboot nodes one by one instead.
-      # Restore the default (delete this block) in the follow-up commit after
-      # the migration succeeded (MIGRATION.md §6).
-      unmanagedPodWatcher:
-        restart: false
 
     # --- Restart agent pods when the cilium-config ConfigMap changes -------
     rollOutCiliumPods: true
