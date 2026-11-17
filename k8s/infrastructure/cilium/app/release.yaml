@@ -120,13 +120,16 @@ spec:
     rollOutCiliumPods: true
 
     # --- Policy enforcement -------------------------------------------------
-    # "never" for the migration: the existing NetworkPolicies (flux-system,
-    # payments) are NOT enforced. Flipped back to "default" in the Phase 2 commit
-    # together with audited/verified policies. Do not flip it earlier: the
-    # payments NetworkPolicy allows ingress only from pods labelled
-    # app.kubernetes.io/name=envoy-gateway, which matches neither the Envoy
-    # Gateway controller nor the Envoy proxy pods (see MIGRATION.md).
-    policyEnforcementMode: never
+    # Phase 2 STEP A (cilium-policies/README.md §5.2): AUDIT mode. Policies are
+    # evaluated and every connection that WOULD be dropped is recorded as an
+    # AUDIT policy-verdict (hubble observe --verdict AUDIT), but NOTHING is
+    # dropped. This is a discovery state, not a safe end state. The existing
+    # payments NetworkPolicy (matches no Envoy pod) is audited too.
+    # Step C (real enforcement): delete `policyAuditMode` in a later commit.
+    # To go back to fully off: set policyEnforcementMode: never and delete
+    # policyAuditMode.
+    policyEnforcementMode: default
+    policyAuditMode: true            # TEMPORARY
 
     # --- Hubble (observability) --------------------------------------------
     hubble:
