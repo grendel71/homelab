@@ -21,7 +21,7 @@ metadata:
   name: cilium-routes
   namespace: flux-system
 spec:
-  suspend: true # GATED — see header comment and MIGRATION.md
+  suspend: false # CUTOVER done, see MIGRATION.md
   interval: 10m
   dependsOn:
     - name: cilium
