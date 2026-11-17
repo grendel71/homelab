@@ -11,8 +11,13 @@
 **Goal:** replace the Talos-bootstrapped Flannel CNI and kube-proxy with Cilium
 (kube-proxy replacement + Hubble), managed by Flux.
 
-**State in git:** the `cilium` and `cilium-routes` Flux Kustomizations are
-**GATED** (`suspend: true`). Merging to `main` does **not** install Cilium, but it
+> **STATUS: EXECUTED on 2026-11-16/17.** The cutover is done (§9 has what actually
+> happened and the corrections to this runbook). The text below is kept as the
+> procedure for a rebuild or a rehearsal. `cilium` and `cilium-routes` are
+> **no longer suspended** in git; do not re-suspend them (§7).
+
+**State in git (before the cutover):** the `cilium` and `cilium-routes` Flux Kustomizations were
+**GATED** (`suspend: true`). Merging to `main` did **not** install Cilium, but it
 is not a no-op. It (1) changes the `payments` HTTPRoute (moved to `envoy-internal`,
 host `papi.internal.grendel71.net`, applied at the next reconcile of `payments`),
 (2) adds the `cilium` HelmRepository (to `sources`, see §0), (3) adds the
@@ -962,3 +967,77 @@ kubectl -n kube-system get ds kube-flannel kube-proxy
   setting is turned off: eBPF host-routing requires `bpf.masquerade=true`
   (Cilium tuning guide), which the Talos guide lists as broken together with
   `forwardKubeDNSToHost`.
+
+## 9. Executed migration (2026-11-16/17): what happened, and corrections
+
+The window was run as written, except that the Velero backup (§1) was skipped on
+purpose (an etcd snapshot was taken instead) and no rehearsal (§1a) was done.
+Result: all 7 nodes on Cilium 1.20.4, Flannel and kube-proxy removed, no data lost,
+`cilium-dbg status` shows `KubeProxyReplacement: True`, `Socket LB: Enabled`,
+`Cluster health: 7/7`, 154/154 controllers healthy, all CNPG clusters healthy,
+all four gateway VIPs answering.
+
+Answers to the open §1a questions, from the real run:
+
+- **(g) Does `Cluster health` reach N/N mid-window?** Yes. `wait_node` reported
+  "cluster health full" for the rebooted workers and control planes while other
+  nodes were still on the old network. The soft-check prompt never fired. Keep the
+  prompt anyway: right after an agent starts, `Cluster health` can read `0/0`
+  (observed on one worker) until the first probe round finishes.
+- **(e) Helper greps match the real 1.20.4 output.** `KubeProxyReplacement: True`
+  and `Socket LB: Enabled` matched on every node.
+- **(a) The Flannel data path does not survive the agents starting.** Right after
+  the Cilium DaemonSet rolled out, the §3 probe failed (100% ping loss, DNS timeout).
+  The outage started at that moment, not at the first reboot. `cni.exclusive`
+  renamed `10-flannel.conflist` to `10-flannel.conflist.cilium_bak` on every node
+  and `05-cilium.conflist` appeared; `cni0` (`.1`) and `cilium_host` (a different
+  `.N` in the same /24) coexisted without a collision on the node checked.
+- The Cilium Helm install itself succeeded in seconds, `disableWait: true` was
+  fine, and the rollout of 7 agents plus 2 operators took about 1 to 2 minutes.
+
+Things that differed from the runbook, with the fix to apply next time:
+
+1. **Check probe exit codes, not pipelines.** An ad hoc check piped the probe
+   through `tail`, so a failed ping still printed "PROBE AFTER CILIUM OK". The
+   `probe` function in §3 is correct; do not wrap it in a pipe. Read the output.
+2. **Ceph mon failover.** While the network was split, Rook failed mon `c`
+   (talos-i4x-2pd) over to a new mon `f` pinned to talos-xyn-p5v. `mon-f` sat
+   `Pending` ("didn't satisfy existing pods anti-affinity", left over from the
+   canary pod). Deleting the Pending pod let it schedule; quorum became `d,e,f`.
+   Add to §5: if a mon pod is Pending after the last reboot, delete that pod
+   before `osd unset noout`. `deploy/rook-ceph-mon-c` stays at 0 replicas. One OSD
+   (`osd.5`) crashed once during the window and came back after its Error pod
+   was deleted. `osd.2` (host `talos-uya-j6b`, which no longer exists) was down
+   before the migration and is not related.
+3. **CNPG hibernation is slow.** The 7 instance pods took about 3 to 4 minutes to
+   terminate (graceful stop). Wait for `kubectl get pods -A -l cnpg.io/cluster`
+   to be empty and for the RBD `VolumeAttachment`s to disappear (§2b gate).
+   `immich-server` and the `bw-portal` worker mount NFS-backed PVCs, not RBD, so
+   they do not need scaling for the attachment gate.
+4. **The kube-vip holder moves.** It was `talos-cp-03` in the pre-checks and
+   `talos-47z-ayo` just before the control-plane reboots, so the "reboot the
+   holder last" order must be computed right before §4, not in §1. After the
+   operator roll in the follow-up values change, the VIP also dropped for a few
+   seconds once (a lease handover); retry before assuming a fault.
+5. **Aborted loops.** If the worker loop is interrupted mid-reboot, do not restart
+   it blindly. Check `uptime` (`talosctl read /proc/uptime`) and the bootID of each
+   node, finish the interrupted node with the `wait_node` checks, then continue.
+6. **`confirm` in the helpers** was replaced by an auto-yes because the whole
+   window was pre-authorised. The etcd, VIP and kube-vip gates still ran before and
+   after each control plane. Keep the interactive prompt when you run this by hand.
+7. **HelmRelease picks up values late.** After merging a values change, the first
+   `flux reconcile helmrelease cilium` still used the old values (the source
+   artifact had not updated). Reconcile `source git`, then `kustomization
+   flux-system`, wait until `kubectl -n kube-system get hr cilium -o
+   jsonpath='{.spec.values}'` shows the new values, then reconcile the HelmRelease.
+8. **Flux resume timeouts.** `flux resume kustomization arr` and `searxng`
+   timed out at 2 minutes. They were resumed anyway; this is harmless.
+9. **Leftover pod objects.** The reboots left about 58 `Failed`/`Error` pod objects.
+   `kubectl delete pod -A --field-selector=status.phase=Failed` removes them. One
+   runner pod (`runner-ghcr-*`) is held by an ARC `actions.summerwind.dev/runner-pod`
+   finalizer and is not related.
+
+Still true after the migration: `policyEnforcementMode` is `default` with
+`policyAuditMode: true` (audit only, see `../cilium-policies/README.md` §5.2);
+`bpf.hostLegacyRouting: true` stays; the migration-only `unmanagedPodWatcher`
+override was removed (§6 done).
