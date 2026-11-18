@@ -6,6 +6,20 @@ model:
   provider: "deepseek"
   base_url: "https://api.deepseek.com/v1"
 
+# Keep DeepSeek as the default while making the LiteLLM-backed ChatGPT model
+# available as `/model custom:litellm:chatgpt-gpt-6.1-sol`.
+providers:
+  litellm:
+    name: "LiteLLM ChatGPT"
+    api: "http://litellm-gateway.litellm.svc.cluster.local:4000/v1"
+    key_env: "LITELLM_API_KEY"
+    transport: "codex_responses"
+    default_model: "chatgpt-gpt-6.1-sol"
+    discover_models: true
+    models:
+      chatgpt-gpt-6.1-sol:
+        context_length: 272000
+
 terminal:
   backend: "local"
   cwd: "/opt/data"
