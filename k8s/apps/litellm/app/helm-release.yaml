@@ -6,6 +6,46 @@ metadata:
   namespace: litellm
 spec:
   interval: 30m
+  postRenderers:
+    # The componentized chart does not expose initContainers. Seed the writable
+    # token PVC before the gateway starts; subsequent starts preserve the
+    # refreshed token written by LiteLLM.
+    - kustomize:
+        patches:
+          - target:
+              version: v1
+              kind: Deployment
+              name: litellm-gateway
+            patch: |
+              - op: add
+                path: /spec/template/spec/initContainers
+                value:
+                  - name: seed-chatgpt-auth
+                    image: busybox:1.37
+                    command:
+                      - sh
+                      - -ec
+                      - |
+                        if [ ! -s /tokens/auth.json ]; then
+                          cp /seed/auth.json /tokens/auth.json
+                          chmod 0660 /tokens/auth.json
+                        fi
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                        drop:
+                          - ALL
+                      runAsGroup: 65532
+                      runAsNonRoot: true
+                      runAsUser: 65532
+                      seccompProfile:
+                        type: RuntimeDefault
+                    volumeMounts:
+                      - name: chatgpt-auth-seed
+                        mountPath: /seed
+                        readOnly: true
+                      - name: chatgpt-tokens
+                        mountPath: /tokens
   chart:
     spec:
       chart: litellm
@@ -40,6 +80,37 @@ spec:
       extraEnv:
         - name: STORE_MODEL_IN_DB
           value: "True"
+        - name: CHATGPT_TOKEN_DIR
+          value: /tokens
+      # The ChatGPT refresh token is single-use. Keep one gateway process and
+      # one pod on the RWO volume so two workers cannot refresh it concurrently.
+      numWorkers: 1
+      hpa:
+        enabled: false
+      replicaCount: 1
+      strategy:
+        type: Recreate
+      podSecurityContext:
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+      volumes:
+        - name: chatgpt-auth-seed
+          secret:
+            secretName: litellm-chatgpt-auth
+        - name: chatgpt-tokens
+          persistentVolumeClaim:
+            claimName: litellm-chatgpt-tokens
+      volumeMounts:
+        - name: chatgpt-tokens
+          mountPath: /tokens
+      config:
+        proxy_config:
+          model_list:
+            - model_name: chatgpt-gpt-6.1-sol
+              litellm_params:
+                model: chatgpt/gpt-6.1-sol
+              model_info:
+                mode: responses
     backend:
       envSecrets:
         - litellm-env
