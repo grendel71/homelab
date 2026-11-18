@@ -135,17 +135,18 @@ metadata:
   name: qbittorrent-ingress
   namespace: torrent
 spec:
-  # Live: 1 Running pod (qbittorrent-8567c44f4f-2g7ts, 2/2: app + gluetun).
+  # Live: 1 Running pod (2/2: app + gluetun).
   endpointSelector:
     matchLabels:
       app.kubernetes.io/name: qbittorrent
       app.kubernetes.io/instance: qbittorrent
   ingress:
     # Envoy proxy of the internal gateway -> qbittorrent webui, TCP 8080 only.
-    # qbittorrent's `securitypolicy.yaml` (k8s/apps/torrent/qbittorrent/)
-    # trusts a header set by the gateway to bypass its own login form; this
-    # rule is what pins that trust to the envoy-internal proxy pod only, so
-    # the bypass cannot be reached by any other in-cluster or external source.
+    # qBittorrent skips its own login for the envoy-internal proxy pod IP
+    # (QB_AUTH_WHITELIST in k8s/apps/torrent/qbittorrent/helm-release.yaml; the
+    # SSO login is done in Envoy by k8s/apps/torrent/qbittorrent/securitypolicy.yaml).
+    # This rule limits who can reach port 8080, so the whitelisted proxy pod is
+    # the only source outside `torrent` that can use that bypass.
     - fromEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: envoy-gateway-system
