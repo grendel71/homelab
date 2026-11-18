@@ -5,7 +5,6 @@ metadata:
   name: infra-secrets
   namespace: flux-system
 resources:
-  - secret-github-token.yaml
   - secret-arc-github-app.yaml
   - secret-rook-db.yaml
   - secret-immich.yaml

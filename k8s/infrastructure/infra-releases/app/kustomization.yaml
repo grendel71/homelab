@@ -6,6 +6,5 @@ metadata:
   namespace: flux-system
 resources:
   - rook-ceph.yaml
-  - actions-runner-controller.yaml
   - gha-runner-scale-set-controller.yaml
   - redis.yaml
