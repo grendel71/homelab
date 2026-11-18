@@ -17,10 +17,16 @@ spec:
             restartPolicy: Always
             image:
               repository: ghcr.io/qdm12/gluetun
-              tag: latest
+              # Pinned to the tested :latest build of 2026-11-12 (commit 450ce09).
+              # Last tagged release is v3.41.3 (older).
+              tag: latest@sha256:cbafe0945d0fe5a3c55ca64d43a85c5db270458f4c645ee65797b527f6f57a64
             securityContext:
               capabilities:
                 add: ["NET_ADMIN"]
+            env:
+              # gluetun INPUT policy is DROP. Allow the qBittorrent WebUI
+              # (shared pod network) so Envoy and other pods can reach it.
+              FIREWALL_INPUT_PORTS: "8080"
             envFrom:
               - secretRef:
                   name: airvpn-secret
