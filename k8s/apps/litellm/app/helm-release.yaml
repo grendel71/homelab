@@ -106,11 +106,6 @@ spec:
       config:
         proxy_config:
           model_list:
-            - model_name: chatgpt-gpt-6.1-sol
-              litellm_params:
-                model: chatgpt/gpt-6.1-sol
-              model_info:
-                mode: responses
             - model_name: chatgpt-gpt-6.2-astra
               litellm_params:
                 model: chatgpt/gpt-6.2-astra
