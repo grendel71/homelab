@@ -64,7 +64,7 @@ Flux starts from `k8s/kustomization.yaml`, which includes `flux-system`, `infras
 
 Main infrastructure dependencies (see each `ks.yaml` for the full list):
 
-- `sources` → `crds`, `infra-secrets` → `infra-releases` → `arc`, `ceph-cluster`
+- `sources` → `crds`, `infra-secrets` → `infra-releases` → `actions-runner-controller` (the scale sets, see [GitHub Actions runners](#github-actions-runners)), `ceph-cluster`
 - `ceph-cluster` → `object-store`, `storage`
 - `cert-manager` → `cert-manager-issuers`; `cert-manager` + `metallb` + `crds` → `envoy-gateway` → `cloudflared`, `external-dns-cloudflare`
 - `traefik-internal` + `envoy-gateway` → `ingress`
@@ -164,6 +164,18 @@ aws s3 ls s3://velero/ --endpoint-url http://192.168.1.231:30304
 ```
 
 Do not print the credential values.
+
+## GitHub Actions runners
+
+Runners use GitHub's **runner scale sets** (chart `0.15.0`). The legacy `summerwind` ARC (PAT auth, `RunnerDeployment`) was removed in Nov 2026. Do not add `actions.summerwind.dev` resources.
+
+- Controller: HelmRelease `arc-gha-controller` in `arc-systems` (`k8s/infrastructure/infra-releases/app/gha-runner-scale-set-controller.yaml`). Source: OCI HelmRepository `arc-gha`.
+- Scale sets: one HelmRelease per repo in `k8s/infrastructure/arc/app/scale-set-*.yaml`, namespace `arc-runners`. The Flux Kustomization is `actions-runner-controller`.
+- Auth: GitHub App, SOPS secret `arc-github-app` (`k8s/infrastructure/infra-secrets/app/secret-arc-github-app.yaml`). No PAT.
+- Current scale sets: `runner-site` (`hugo-site`), `runner-bitwarden` (`bitwarden-portal`, dind), `runner-lifter` (`lifter-api`, dind). All have `minRunners: 0`, `maxRunners: 2`. A first job has a cold start.
+- A workflow selects a scale set with `runs-on: <runnerScaleSetName>`. A workflow with `runs-on` for a scale set that does not exist waits forever.
+- To add a repo: copy a `scale-set-*.yaml`, change `githubConfigUrl`, `releaseName` and `runnerScaleSetName`, add it to `arc/app/kustomization.yaml`, and install the GitHub App on that repo.
+- Check: `kubectl get autoscalinglisteners -n arc-systems` (one listener per scale set) and `kubectl -n arc-systems get pods`. No runner pods in `arc-runners` is normal when no job runs.
 
 ## Removing a node (runbook)
 
