@@ -23,6 +23,10 @@ spec:
             env:
               PUID: "1000"
               PGID: "1000"
+              # Login is done by Envoy Gateway basic auth (SecurityPolicy prowlarr-basic-auth).
+              # Do NOT remove the SecurityPolicy while this is set: the UI would be open.
+              PROWLARR__AUTH__METHOD: External
+              PROWLARR__AUTH__REQUIRED: Enabled
     persistence:
       config:
         existingClaim: prowlarr-config-pvc
