@@ -36,12 +36,14 @@ spec:
     gateway:
       envSecrets:
         - litellm-env
+        - litellm-sso
       extraEnv:
         - name: STORE_MODEL_IN_DB
           value: "True"
     backend:
       envSecrets:
         - litellm-env
+        - litellm-sso
       extraEnv:
         - name: STORE_MODEL_IN_DB
           value: "True"

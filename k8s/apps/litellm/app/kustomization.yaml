@@ -7,3 +7,4 @@ resources:
   - redis.yaml
   - httproute.yaml
   - secret-litellm.yaml
+  - secret-sso.yaml
