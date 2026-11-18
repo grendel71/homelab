@@ -6,3 +6,9 @@ resources:
   - pvc.yaml
   - secret-oidc.yaml
   - securitypolicy.yaml
+configMapGenerator:
+  - name: qbittorrent-init-scripts
+    files:
+      - 10-webui.sh
+    options:
+      disableNameSuffixHash: true

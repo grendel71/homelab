@@ -41,6 +41,7 @@ spec:
             env:
               PUID: "1000"
               PGID: "1000"
+              DOCKER_MODS: ghcr.io/vuetorrent/vuetorrent-lsio-mod:2.37.0
     persistence:
       config:
         existingClaim: torrent-config-pvc
@@ -51,6 +52,15 @@ spec:
         globalMounts:
           - path: /downloads
             subPath: qb/downloads
+      init-scripts:
+        type: configMap
+        name: qbittorrent-init-scripts
+        defaultMode: 493 # octal 0755
+        advancedMounts:
+          qbittorrent:
+            app:
+              - path: /custom-cont-init.d
+                readOnly: true
     service:
       app:
         controller: qbittorrent
