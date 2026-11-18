@@ -1,0 +1,42 @@
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: sonarr-basic-auth
+  namespace: torrent
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: sonarr
+  basicAuth:
+    users:
+      name: arr-basic-auth
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: radarr-basic-auth
+  namespace: torrent
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: radarr
+  basicAuth:
+    users:
+      name: arr-basic-auth
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: prowlarr-basic-auth
+  namespace: torrent
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: prowlarr
+  basicAuth:
+    users:
+      name: arr-basic-auth
