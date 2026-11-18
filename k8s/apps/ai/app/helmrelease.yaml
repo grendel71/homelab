@@ -27,7 +27,8 @@ spec:
                 set -euo pipefail
                 mkdir -p /opt/data
                 cp /run/config/config.yaml /opt/data/config.yaml
-                chown 10000:10000 /opt/data/config.yaml
+                # One-time migration from UID 10000 to 3000. Remove -R after one good start.
+                chown -R 3000:3000 /opt/data
         containers:
           app:
             image:
@@ -46,7 +47,9 @@ spec:
               HERMES_DASHBOARD_HOST: 0.0.0.0
               HERMES_DASHBOARD_PORT: &dashboardPort 9119
               HERMES_DASHBOARD_PUBLIC_URL: https://hermes.x.nx8192.win
+              HERMES_GID: "3000"
               HERMES_HOME: /opt/data
+              HERMES_UID: "3000"
               HOME: /opt/data
               TERM: xterm-256color
             envFrom:
@@ -64,7 +67,7 @@ spec:
     defaultPodOptions:
       automountServiceAccountToken: true
       securityContext:
-        fsGroup: 10000
+        fsGroup: 3000
         fsGroupChangePolicy: OnRootMismatch
     service:
       app:
