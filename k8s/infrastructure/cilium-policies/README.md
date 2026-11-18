@@ -239,6 +239,10 @@ Live pod counts are Running pods matched by the selector (read-only
 | `jellyfin-ingress` | apps | `name=jellyfin,instance=jellyfin` (1) | Envoy `envoy-external` :8096 | open (not restricted) | `httproute.yaml` (jellyfin:8096), live endpoints |
 | `website-ingress` | apps | `name=website,instance=website` (3) | Envoy `envoy-external` :80 | n/a | `helm-release.yaml` route, Caddyfile `:80` |
 | `website-egress` | apps | same (3) | n/a | kube-dns :53; `rook-ceph` pods `app=rook-ceph-rgw,rgw=ceph-objectstore` :8080 only | Caddyfile `reverse_proxy ...rook-ceph-rgw...`; Service 80 -> 8080 live |
+| `sonarr-ingress` | torrent | `name=sonarr,instance=sonarr` (1) | Envoy `envoy-internal` TCP 8989; any pod in `torrent` TCP 8989 | open | `httproute.yaml` (sonarr:8989, parentRef `envoy-internal`); live Hubble sample (sonarr<->qbittorrent flows) |
+| `radarr-ingress` | torrent | `name=radarr,instance=radarr` (1) | Envoy `envoy-internal` TCP 7878; any pod in `torrent` TCP 7878 | open | `httproute.yaml` (radarr:7878); live Hubble sample confirms `envoy-internal` -> radarr:7878 |
+| `prowlarr-ingress` | torrent | `name=prowlarr,instance=prowlarr` (1) | Envoy `envoy-internal` TCP 9696; any pod in `torrent` TCP 9696 | open | `httproute.yaml` (prowlarr:9696, parentRef `envoy-internal`) |
+| `qbittorrent-ingress` | torrent | `name=qbittorrent,instance=qbittorrent` (1) | Envoy `envoy-internal` TCP 8080; any pod in `torrent` TCP 8080 | open | `httproute.yaml` (qbittorrent:8080); live Hubble sample confirms sonarr/radarr -> qbittorrent:8080 |
 
 Peer selectors verified live: Envoy proxies `external` = 1 pod, `internal` +
 `external` = 2 pods; deny set `internal` + `nx` + `tcp-gateway` = 3 Running

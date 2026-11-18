@@ -10,3 +10,4 @@ resources:
   - lifter.yaml
   - jellyfin.yaml
   - website.yaml
+  - torrent.yaml

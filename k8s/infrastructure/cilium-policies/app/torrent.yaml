@@ -1,0 +1,192 @@
+---
+# torrent namespace: sonarr, radarr, prowlarr (the *arr apps) and qbittorrent.
+# Live pod labels (kubectl -n torrent get pods --show-labels):
+#   sonarr:      app.kubernetes.io/name=sonarr,      instance=sonarr,      controller=sonarr
+#   radarr:      app.kubernetes.io/name=radarr,      instance=radarr,      controller=radarr
+#   prowlarr:    app.kubernetes.io/name=prowlarr,    instance=prowlarr,    controller=prowlarr
+#   qbittorrent: app.kubernetes.io/name=qbittorrent, instance=qbittorrent, controller=qbittorrent
+# name+instance alone already selects exactly one app (no other pod in the
+# namespace shares either value), so `controller` is not needed to disambiguate.
+# Container ports (kubectl -n torrent get pods -o jsonpath ... .spec.containers[*].ports):
+#   sonarr app:8989, radarr app:7878, prowlarr app:9696, qbittorrent app:8080
+#   (qbittorrent's second container is gluetun/VPN; this policy only concerns
+#   the `app` container's webui port 8080, not gluetun's VPN/proxy ports).
+# All four HTTPRoutes (k8s/apps/torrent/{arr,qbittorrent}/) attach only to
+# Gateway envoy-internal (parentRefs, live: kubectl -n torrent get httproute -o yaml):
+#   sonarr.internal.grendel71.net, radarr.internal.grendel71.net,
+#   prowlarr.internal.grendel71.net, qb.internal.grendel71.net.
+# None of these apps is routed through envoy-external.
+# Live Hubble sample (hubble observe --to-namespace torrent --last 300, read-only,
+# ~2 min window) shows FORWARDED flows from the envoy-internal proxy pod to
+# radarr:7878, and FORWARDED flows between sonarr/radarr and qbittorrent:8080
+# inside the namespace (the *arr apps call qBittorrent's API to manage
+# downloads). The only cross-namespace source reaching a pod port in scope is
+# envoy-internal; `world` and `coredns` flows seen in the sample are
+# qbittorrent's own BitTorrent traffic and DNS replies, not inbound to 8989/
+# 7878/9696/8080, so they are outside the scope of this ingress policy. No
+# source from `apps` (e.g. jellyfin) was seen in the sample; see the
+# commented snippet below for what to add if that changes.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: sonarr-ingress
+  namespace: torrent
+spec:
+  # Live: 1 Running pod (sonarr-58f85fc9d8-*).
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: sonarr
+      app.kubernetes.io/instance: sonarr
+  ingress:
+    # Envoy proxy of the internal gateway -> sonarr web/API, TCP 8989 only.
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+            app.kubernetes.io/name: envoy
+            app.kubernetes.io/component: proxy
+            gateway.envoyproxy.io/owning-gateway-name: envoy-internal
+      toPorts:
+        - ports:
+            - port: "8989"
+              protocol: TCP
+    # Any pod in `torrent` -> sonarr, TCP 8989 only (radarr/prowlarr/
+    # qbittorrent call each other's API; e.g. prowlarr pushes indexers to
+    # sonarr, qbittorrent notifies sonarr on download completion).
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: torrent
+      toPorts:
+        - ports:
+            - port: "8989"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: radarr-ingress
+  namespace: torrent
+spec:
+  # Live: 1 Running pod (radarr-7fdcbc9ccf-vkj4z). A second pod of the same
+  # ReplicaSet (radarr-7fdcbc9ccf-drtpp) is Completed (not currently selected
+  # by any traffic-serving policy, but the label selector would match it too
+  # if it started Running again).
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: radarr
+      app.kubernetes.io/instance: radarr
+  ingress:
+    # Envoy proxy of the internal gateway -> radarr web/API, TCP 7878 only.
+    # Live Hubble sample confirms this flow (envoy-internal -> radarr:7878).
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+            app.kubernetes.io/name: envoy
+            app.kubernetes.io/component: proxy
+            gateway.envoyproxy.io/owning-gateway-name: envoy-internal
+      toPorts:
+        - ports:
+            - port: "7878"
+              protocol: TCP
+    # Any pod in `torrent` -> radarr, TCP 7878 only (same reasoning as sonarr).
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: torrent
+      toPorts:
+        - ports:
+            - port: "7878"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: prowlarr-ingress
+  namespace: torrent
+spec:
+  # Live: 1 Running pod (prowlarr-6d69f497cc-lzwsf).
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: prowlarr
+      app.kubernetes.io/instance: prowlarr
+  ingress:
+    # Envoy proxy of the internal gateway -> prowlarr web/API, TCP 9696 only.
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+            app.kubernetes.io/name: envoy
+            app.kubernetes.io/component: proxy
+            gateway.envoyproxy.io/owning-gateway-name: envoy-internal
+      toPorts:
+        - ports:
+            - port: "9696"
+              protocol: TCP
+    # Any pod in `torrent` -> prowlarr, TCP 9696 only (sonarr/radarr sync
+    # indexers from prowlarr's API).
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: torrent
+      toPorts:
+        - ports:
+            - port: "9696"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: qbittorrent-ingress
+  namespace: torrent
+spec:
+  # Live: 1 Running pod (qbittorrent-8567c44f4f-2g7ts, 2/2: app + gluetun).
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: qbittorrent
+      app.kubernetes.io/instance: qbittorrent
+  ingress:
+    # Envoy proxy of the internal gateway -> qbittorrent webui, TCP 8080 only.
+    # qbittorrent's `securitypolicy.yaml` (k8s/apps/torrent/qbittorrent/)
+    # trusts a header set by the gateway to bypass its own login form; this
+    # rule is what pins that trust to the envoy-internal proxy pod only, so
+    # the bypass cannot be reached by any other in-cluster or external source.
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+            app.kubernetes.io/name: envoy
+            app.kubernetes.io/component: proxy
+            gateway.envoyproxy.io/owning-gateway-name: envoy-internal
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+    # Any pod in `torrent` -> qbittorrent webui, TCP 8080 only. Live Hubble
+    # sample confirms sonarr/radarr -> qbittorrent:8080 (the *arr apps manage
+    # downloads through qBittorrent's Web API).
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: torrent
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+# NOT allowed (no evidence in git or in the Hubble sample): any source outside
+# `torrent`, other than the envoy-internal proxy pod, reaching any of these
+# four apps. In particular, once audit mode is removed and enforcement is
+# real, a pod in `apps` (e.g. jellyfin, for library-scan notifications sonarr/
+# radarr might be configured to send) would be DROPPED. `app/jellyfin.yaml`
+# already documents the matching gap in the other direction (torrent -> jellyfin
+# :8096). If Hubble ever shows apps/jellyfin reaching one of these pods, add to
+# the relevant policy above:
+#   - fromEndpoints:
+#       - matchLabels:
+#           k8s:io.kubernetes.pod.namespace: apps
+#           app.kubernetes.io/name: jellyfin
+#           app.kubernetes.io/instance: jellyfin
+#     toPorts:
+#       - ports: [{port: "<8989|7878|9696|8080>", protocol: TCP}]
+# This cluster is still in AUDIT mode today (cilium HelmRelease
+# policyEnforcementMode: default, policyAuditMode: true): nothing above is
+# dropped yet, only logged as an AUDIT verdict. These four policies only
+# pin down what is ALLOWED once audit mode is removed; they change nothing
+# in the cluster right now.
+# EGRESS is deliberately NOT restricted (default allow-all) for all four
+# apps: the *arr apps and qbittorrent reach the internet (indexers, trackers,
+# metadata), each other's APIs, DNS and the media/download NFS/Ceph volumes;
+# none of that is captured here per the task scope.
