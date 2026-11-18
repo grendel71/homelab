@@ -19,5 +19,3 @@ spec:
     scopes:
       - profile
       - email
-    cookieNames:
-      suffix: qbittorrent
