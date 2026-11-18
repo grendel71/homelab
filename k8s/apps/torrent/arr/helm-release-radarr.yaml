@@ -28,6 +28,16 @@ spec:
               # Do NOT remove the SecurityPolicy while this is set: the UI would be open.
               RADARR__AUTH__METHOD: External
               RADARR__AUTH__REQUIRED: Enabled
+            # LinuxServer s6 init starts as root, chowns /config, then switches to PUID/PGID.
+            # These six capabilities are kept (KILL: s6 must signal the service that runs as PUID); the rest are dropped.
+            # readOnlyRootFilesystem and runAsNonRoot are not possible with this image.
+            securityContext:
+              allowPrivilegeEscalation: false
+              seccompProfile:
+                type: RuntimeDefault
+              capabilities:
+                drop: ["ALL"]
+                add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "KILL", "SETGID", "SETUID"]
     persistence:
       config:
         existingClaim: radarr-config-pvc
