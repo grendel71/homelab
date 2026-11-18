@@ -2,23 +2,31 @@
 # Full reference:
 # https://github.com/NousResearch/hermes-agent/blob/main/cli-config.yaml.example
 model:
-  default: "deepseek-v4-pro"
-  provider: "deepseek"
-  base_url: "https://api.deepseek.com/v1"
+  default: "chatgpt-gpt-6.2-sol"
+  provider: "custom:litellm"
 
-# Keep DeepSeek as the default while making the LiteLLM-backed ChatGPT model
-# available as `/model custom:litellm:chatgpt-gpt-6.1-sol`.
+# All models go through LiteLLM over the Responses API. LiteLLM sends the
+# ChatGPT routes natively and converts DeepSeek to Chat Completions.
+# Switch with `/model custom:litellm:<model>`.
 providers:
   litellm:
-    name: "LiteLLM ChatGPT"
+    name: "LiteLLM"
     api: "http://litellm-gateway.litellm.svc.cluster.local:4000/v1"
     key_env: "LITELLM_API_KEY"
     transport: "codex_responses"
-    default_model: "chatgpt-gpt-6.1-sol"
+    default_model: "chatgpt-gpt-6.2-sol"
     discover_models: true
     models:
-      chatgpt-gpt-6.1-sol:
-        context_length: 272000
+      chatgpt-gpt-6.2-astra:
+        context_length: 1050000
+      chatgpt-gpt-6.2-sol:
+        context_length: 1050000
+      chatgpt-gpt-6.1-terra:
+        context_length: 1050000
+      chatgpt-gpt-6-luna:
+        context_length: 1050000
+      deepseek-v4-pro:
+        context_length: 1048576
 
 terminal:
   backend: "local"
