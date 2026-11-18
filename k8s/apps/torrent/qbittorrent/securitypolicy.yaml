@@ -1,0 +1,23 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: qbittorrent-oidc
+  namespace: torrent
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: qbittorrent
+  oidc:
+    provider:
+      issuer: "https://ak.grendel71.net/application/o/qb/"
+    clientID: "EbPa0CUFeU0xEIhMQLvUqF9qEU0hKmbfqnILzayF"
+    clientSecret:
+      name: qbittorrent-oidc
+    redirectURL: "https://qb.internal.grendel71.net/oauth2/callback"
+    logoutPath: "/oauth2/logout"
+    scopes:
+      - profile
+      - email
+    cookieNames:
+      suffix: qbittorrent
