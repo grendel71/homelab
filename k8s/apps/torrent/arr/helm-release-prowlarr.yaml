@@ -16,7 +16,8 @@ spec:
           app:
             image:
               repository: linuxserver/prowlarr
-              tag: latest
+              # Pinned to the digest running on 2026-11-18. To update: pull latest, test, change the digest.
+              tag: latest@sha256:45117ba8439e2337a92ffe38a451a4dafc0be771754d05d88cdf102419d09646
             ports:
               - name: http
                 containerPort: 9696

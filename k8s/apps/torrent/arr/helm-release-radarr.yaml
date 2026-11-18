@@ -16,7 +16,8 @@ spec:
           app:
             image:
               repository: linuxserver/radarr
-              tag: latest
+              # Pinned to the digest running on 2026-11-18. To update: pull latest, test, change the digest.
+              tag: latest@sha256:044788f5508b7f67a3e0368cdd142c77c4d4cd5aec2efaba53e1a68b6b6231e7
             ports:
               - name: http
                 containerPort: 7878
