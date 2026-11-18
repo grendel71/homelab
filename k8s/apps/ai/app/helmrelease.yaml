@@ -27,8 +27,7 @@ spec:
                 set -euo pipefail
                 mkdir -p /opt/data
                 cp /run/config/config.yaml /opt/data/config.yaml
-                # One-time migration from UID 10000 to 3000. Remove -R after one good start.
-                chown -R 3000:3000 /opt/data
+                chown 3000:3000 /opt/data/config.yaml
         containers:
           app:
             image:
