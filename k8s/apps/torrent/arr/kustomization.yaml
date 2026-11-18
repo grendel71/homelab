@@ -6,5 +6,5 @@ resources:
   - helm-release-radarr.yaml
   - helm-release-prowlarr.yaml
   - pvcs.yaml
-  - secret-basic-auth.yaml
+  - secret-oidc.yaml
   - securitypolicy.yaml

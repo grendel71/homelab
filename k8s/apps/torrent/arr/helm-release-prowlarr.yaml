@@ -24,7 +24,7 @@ spec:
             env:
               PUID: "1000"
               PGID: "1000"
-              # Login is done by Envoy Gateway basic auth (SecurityPolicy prowlarr-basic-auth).
+              # Login is done by Authentik OIDC at Envoy Gateway (SecurityPolicy prowlarr-oidc).
               # Do NOT remove the SecurityPolicy while this is set: the UI would be open.
               PROWLARR__AUTH__METHOD: External
               PROWLARR__AUTH__REQUIRED: Enabled

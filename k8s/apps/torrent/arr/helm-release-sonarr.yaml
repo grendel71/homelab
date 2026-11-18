@@ -24,7 +24,7 @@ spec:
             env:
               PUID: "1000"
               PGID: "1000"
-              # Login is done by Envoy Gateway basic auth (SecurityPolicy sonarr-basic-auth).
+              # Login is done by Authentik OIDC at Envoy Gateway (SecurityPolicy sonarr-oidc).
               # Do NOT remove the SecurityPolicy while this is set: the UI would be open.
               SONARR__AUTH__METHOD: External
               SONARR__AUTH__REQUIRED: Enabled

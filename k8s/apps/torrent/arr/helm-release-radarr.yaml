@@ -24,7 +24,7 @@ spec:
             env:
               PUID: "1000"
               PGID: "1000"
-              # Login is done by Envoy Gateway basic auth (SecurityPolicy radarr-basic-auth).
+              # Login is done by Authentik OIDC at Envoy Gateway (SecurityPolicy radarr-oidc).
               # Do NOT remove the SecurityPolicy while this is set: the UI would be open.
               RADARR__AUTH__METHOD: External
               RADARR__AUTH__REQUIRED: Enabled
