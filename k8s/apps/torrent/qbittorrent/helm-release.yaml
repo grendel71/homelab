@@ -42,6 +42,10 @@ spec:
               PUID: "1000"
               PGID: "1000"
               DOCKER_MODS: ghcr.io/vuetorrent/vuetorrent-lsio-mod:2.37.0
+              # Skip qBittorrent's own login for the envoy-internal proxy pod only (SSO is done
+              # in Envoy). This is a pod IP: if the proxy pod is recreated its IP changes and the
+              # qBittorrent login comes back until this value is updated.
+              QB_AUTH_WHITELIST: "10.244.4.192/32"
     persistence:
       config:
         existingClaim: torrent-config-pvc
