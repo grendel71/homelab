@@ -111,6 +111,30 @@ spec:
                 model: chatgpt/gpt-6.1-sol
               model_info:
                 mode: responses
+            - model_name: chatgpt-gpt-6.2-astra
+              litellm_params:
+                model: chatgpt/gpt-6.2-astra
+              model_info:
+                mode: responses
+            - model_name: chatgpt-gpt-6.2-sol
+              litellm_params:
+                model: chatgpt/gpt-6.2-sol
+              model_info:
+                mode: responses
+            - model_name: chatgpt-gpt-6.1-terra
+              litellm_params:
+                model: chatgpt/gpt-6.1-terra
+              model_info:
+                mode: responses
+            - model_name: chatgpt-gpt-6-luna
+              litellm_params:
+                model: chatgpt/gpt-6-luna
+              model_info:
+                mode: responses
+            - model_name: deepseek-v4-pro
+              litellm_params:
+                model: deepseek/deepseek-v4-pro
+                api_key: os.environ/DEEPSEEK_API_KEY
     backend:
       envSecrets:
         - litellm-env
