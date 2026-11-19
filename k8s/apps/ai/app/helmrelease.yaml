@@ -107,6 +107,8 @@ spec:
         globalMounts:
           - path: /mnt/grendel
             subPath: nextcloud
+          - path: /mnt/Vault
+            subPath: Vault
       tmpfs:
         type: emptyDir
         globalMounts:
